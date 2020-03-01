@@ -49,6 +49,9 @@
  *
  */
 
+/***************************
+ * TODO: make PWM Timer configurable
+ ***************************/
 
 #if !defined(STM32F446xx) && !defined(STM32F411xx)
 #warning !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -393,20 +396,20 @@ void lcd_init_backlight(void) {
 
 	RCC->AHB1ENR |= (1<<RCC_AHB1ENR_GPIOAEN_Pos);  /* enable GPIOA clock */
 
-    GPIOB->AFR[0] |= (2<<GPIO_AFRL_AFSEL6_Pos);    /* PB6 pin for TIM2/CH1 (AF=2) */
-    GPIOB->OTYPER |= (1<<GPIO_OTYPER_OT6_Pos);     /* Set open drain for PB6 */
-    GPIOB->MODER &= ~(3<<GPIO_MODER_MODER6_Pos);   /* Clear MODER bits */
-    GPIOB->MODER |=  (2<<GPIO_MODER_MODER6_Pos);   /* Select Alternate Function */
+	GPIOB->AFR[0] |= (2<<GPIO_AFRL_AFSEL6_Pos);    /* PB6 pin for TIM2/CH1 (AF=2) */
+	GPIOB->OTYPER |= (1<<GPIO_OTYPER_OT6_Pos);     /* Set open drain for PB6 */
+	GPIOB->MODER &= ~(3<<GPIO_MODER_MODER6_Pos);   /* Clear MODER bits */
+	GPIOB->MODER |=  (2<<GPIO_MODER_MODER6_Pos);   /* Select Alternate Function */
 
-    /* setup TIM2 */
-    RCC->APB1ENR |= (1<<RCC_APB1ENR_TIM4EN_Pos);   /* Enable TIM4 clock */
-    TIM4->PSC = LCD_PRESCALER - 1;                 /* Divided by PRESCALER */
-    TIM4->ARR = LCD_TIM_TOP - 1;                   /* Divided by TIM_TOP */
-    TIM4->CNT = 0;                                 /* Set counter to 0 */
-    TIM4->CCMR1 = 6<<TIM_CCMR1_OC1M_Pos;           /* PWM mode */
-    TIM4->CCER = 1<<TIM_CCER_CC1E_Pos;             /* Enable PWM CH1 */
-    TIM4->CCR1 = LCD_TIM_TOP - 1;                  /* Maximum brightness */
-    TIM4->CR1 = 1<<TIM_CR1_CEN_Pos;                /* Enable timer */
+	/* setup TIM4 */
+	RCC->APB1ENR |= (1<<RCC_APB1ENR_TIM4EN_Pos);   /* Enable TIM4 clock */
+	TIM4->PSC = LCD_PRESCALER - 1;                 /* Divided by LCD_PRESCALER */
+	TIM4->ARR = LCD_TIM_TOP - 1;                   /* Divided by LCD_TIM_TOP */
+	TIM4->CNT = 0;                                 /* Set counter to 0 */
+	TIM4->CCMR1 = 6<<TIM_CCMR1_OC1M_Pos;           /* PWM mode */
+	TIM4->CCER = 1<<TIM_CCER_CC1E_Pos;             /* Enable PWM CH1 */
+	TIM4->CCR1 = LCD_TIM_TOP - 1;                  /* Maximum brightness */
+	TIM4->CR1 = 1<<TIM_CR1_CEN_Pos;                /* Enable timer */
 }
 
 /* Function lcd_set_backlight
