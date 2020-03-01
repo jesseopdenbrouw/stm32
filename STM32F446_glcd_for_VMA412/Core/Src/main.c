@@ -38,22 +38,31 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "main.h"
 #include "glcd_ili9341_stm32.h"
 
+
+/* The Nucleo Boards have an 8 MHz external clock source */
+#if defined(HSE_VALUE)
+#warning Make sure that HSE_VALUE is set to 8000000 (8 MHz)
+#undef HSE_VALUE
+#endif /* HSE_VALUE */
+  /*!< Value of the External oscillator in Hz */
+#define HSE_VALUE    ((uint32_t)8000000U)
+
+
 #define USEMAXMHZ
 
 /* Test for boards */
 #if defined(STM32F446xx)
-#define GLCD_RCC_M (378)
+#define GLCD_RCC_M (420)
 #elif defined(STM32F411xx)
-#define GLCD_RCC_M (225)
+#define GLCD_RCC_M (250)
 #else
 #undef USEMAXMHZ
 #define GLCD_RCC_M (50)
 #endif
-int main(void)
-{
-  uint16_t i, j;
-  //uint16_t data[1000];
-  uint32_t ranx, rany, ranc;
+
+int main(void) {
+	 uint16_t i, j;
+	 uint32_t ranx, rany, ranc;
 
 #ifdef USEMAXMHZ
 
@@ -68,10 +77,10 @@ int main(void)
 	/* Start the Main PLL to MAX MHz
 	 * FREQ = ((HSE/M)*N)/P
 	 * 1 MHz <= HSE/M <= 2 MHz
-	 * 50 <= N <= 432      2 <= M <= 63    P = 2,4,6,8
+	 * 50 <= N <= 432      2 <= M <= 63    P = 2(0),4(1),6(2),8(3)
 	 */
-	RCC->PLLCFGR = (GLCD_RCC_M<<RCC_PLLCFGR_PLLN_Pos) | (6<<RCC_PLLCFGR_PLLM_Pos) |
-			       (2<<RCC_PLLCFGR_PLLP_Pos) | (0<<RCC_PLLCFGR_PLLSRC_Pos);
+	RCC->PLLCFGR = (420<<RCC_PLLCFGR_PLLN_Pos) | (5<<RCC_PLLCFGR_PLLM_Pos) |
+				   (1<<RCC_PLLCFGR_PLLP_Pos) | (1<<RCC_PLLCFGR_PLLSRC_Pos);
 
 	/* Enable HSE, PLL */
 	RCC->CR |= RCC_CR_HSEON | RCC_CR_PLLON;
