@@ -7,6 +7,9 @@
 
 Software License Agreement (BSD License)
 
+Version: 0.1
+Date: 2020/03/03
+
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
 Portions based on :
@@ -1045,6 +1048,7 @@ void glcd_display(glcd_display_t what) {
 
 /* Flood fill an object */
 /* ONLY WORKS FOR SMALL AREAS */
+/* Because of the recursive behavior of this routine, stack overflow is likely to occur */
 /* Based on https://www.javatpoint.com/computer-graphics-flood-fill-algorithm */
 //void glcd_floodfill(uint16_t x,uint16_t y, uint32_t fillColor, uint32_t defaultColor) {
 //	uint32_t readcol;

@@ -7,6 +7,9 @@
 
 Software License Agreement (BSD License)
 
+Version: 0.1
+Date: 2020/03/03
+
 Copyright (c) 2020 Jesse op den Brouw. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -67,7 +70,7 @@ int main(void) {
 #ifdef USEMAXMHZ
 
 	/* 5 wait states */
-	FLASH->ACR = (FLASH_ACR_LATENCY_5WS << FLASH_ACR_LATENCY_Pos);
+ 	FLASH->ACR = (FLASH_ACR_LATENCY_5WS << FLASH_ACR_LATENCY_Pos);
 
 	/* Caches enable, prefetch enable */
 	FLASH->ACR |= (FLASH_ACR_PRFTEN | FLASH_ACR_ICEN | FLASH_ACR_DCEN);

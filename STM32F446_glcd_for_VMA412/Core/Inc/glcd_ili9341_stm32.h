@@ -7,6 +7,9 @@
 
 Software License Agreement (BSD License)
 
+Version: 0.1
+Date: 2020/03/03
+
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
 Portions based on :
