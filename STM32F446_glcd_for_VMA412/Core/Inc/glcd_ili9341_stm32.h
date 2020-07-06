@@ -1,5 +1,5 @@
 /*
- * Routines for using the VMA412 touchscreen Graphic LCD
+ * Routines for using the Velleman VMA412 touchscreen Graphic LCD
  *
  * Note: pin assignment for STM32F446 Nucleo Board
  *
@@ -7,8 +7,8 @@
 
 Software License Agreement (BSD License)
 
-Version: 0.1
-Date: 2020/03/03
+Version: 0.2
+Date: 2020/06/29
 
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
@@ -41,7 +41,40 @@ POSSIBILITY OF SUCH DAMAGE.
 #ifndef INC_GLCD_ILI9341_STM32_H_
 #define INC_GLCD_ILI9341_STM32_H_
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
+/* Driver version */
+#define GLCD_VERSION "STM32 GLCD ILI9341 Driver Version 0.2 (" __DATE__ ")"
+
+
+/* Should we use flood fill? */
+#define GLCD_USE_FLOOD_FILL
+/* Increase if you have problems */
+#define GLCD_STACK_SIZE (2000)
+/* Print error message if stack overflows */
+#define GLCD_USE_FLOOD_FILL_PRINT_IF_STACK_OVERFLOW
+/* Do we include the arc function, needs sinf and cosf functions */
+#define GLCD_USE_ARC
+
+/* Width and the height in pixels, landscape */
+#define GLCD_WIDTH (320)
+#define GLCD_HEIGHT (240)
 #include <stdint.h>
+
+/* Color is defined as 32 bit */
+typedef uint32_t glcd_color_t;
+/* Buffer for actions is one of uint8_t or uint16_t */
+/* For minimum resources, select uint8_t */
+/* For fastest code, select uint16_t */
+/* You could select uint32_t, but that's waste of space and time */
+typedef uint16_t glcd_buffer_t;
+
+/* For high level commands */
+/* How to rotate the screen, by hardware */
+typedef enum {GLCD_SCREEN_ROT0=0, GLCD_SCREEN_ROT90=1, GLCD_SCREEN_ROT180=2, GLCD_SCREEN_ROT270=3} glcd_rotation_t;
 
 /* How a string is spaced on the GLCD */
 typedef enum {GLCD_STRING_CONDENSED=1, GLCD_STRING_NORMAL=4, GLCD_STRING_WIDE=8} glcd_spacing_t;
@@ -55,7 +88,19 @@ typedef enum {GLCD_DISPLAY_IDLE_OFF=0, GLCD_DISPLAY_IDLE_ON=1} glcd_display_idle
 /* To turn the display on or off */
 typedef enum {GLCD_DISPLAY_OFF=0, GLCD_DISPLAY_ON=1} glcd_display_t;
 
-/* Some primary colors */
+/* For low level commands */
+/* How to use the CS pin */
+typedef enum {GLCD_CS_TO_HIGH, GLCD_CS_KEEP_LOW, GLCD_CS_TOGGLE} glcd_cs_t;
+/* Direction of the data pins */
+typedef enum {GLCD_KEEP_DATA_OUTPUT, GLCD_MAKE_DATA_INPUT} glcd_dir_t;
+
+/* Some primary colors
+ * Colors are made up by 00rrggbb
+ * 00 = 0 (zero), must keep to 00
+ * rr = red 8 bit, only upper 6 bits are use
+ * gg = green 8 bit, only upper 6 bits are use
+ * bb = blue 8 bit, only upper 6 bits are use
+ */
 #define GLCD_COLOR_BLACK   (0x000000)
 #define GLCD_COLOR_BLUE    (0x0000ff)
 #define GLCD_COLOR_GREEN   (0x00ff00)
@@ -89,52 +134,78 @@ void glcd_init(void);
 
 /* Low level commands */
 /* A read is always explicitly terminated */
-void glcd_read_terminate(uint16_t cmd, uint16_t amount, uint16_t data[]);
+void glcd_read_terminate(uint16_t cmd, uint16_t amount, glcd_buffer_t data[]);
 /* A write not explicitly terminated */
-void glcd_write(uint16_t cmd, uint16_t amount, const uint16_t data[]);
+void glcd_write(uint16_t cmd, uint16_t amount, const glcd_buffer_t data[]);
 /* Terminate a write */
 void gcld_terminate_write(void);
-/* Delay in ms */
-void glcd_delay_ms(uint32_t delay);
+/* Sets the delay (width) of the write pulse, USE WITH CARE */
+void glcd_set_write_pulse_delay(uint32_t delay);
+
 
 /* High level commands */
+/* Delay in ms */
+void glcd_delay_ms(uint32_t delay);
+/* Set screen rotation */
+void glcd_setrotation(glcd_rotation_t rot);
 /* Clear the screen */
 void glcd_cls(uint32_t color);
 /* Plot a pixel on (x,y) */
-void glcd_plotpixel(uint16_t x, uint16_t y, uint32_t color);
+void glcd_plotpixel(uint16_t x, uint16_t y, glcd_color_t color);
 /* Read pixel data */
-uint32_t glcd_readpixel(uint16_t x, uint16_t y);
+glcd_color_t glcd_readpixel(uint16_t x, uint16_t y);
 /* Plot a horizontal line starting on (x,y) with width w */
-void glcd_plothorizontalline(uint16_t x, uint16_t y, uint16_t w, uint32_t color);
+void glcd_plothorizontalline(uint16_t x, uint16_t y, uint16_t w, glcd_color_t color);
 /* Plot a vertical line starting on (x,y) with height h */
-void glcd_plotverticalline(uint16_t x, uint16_t y, uint16_t h, uint32_t color);
+void glcd_plotverticalline(uint16_t x, uint16_t y, uint16_t h, glcd_color_t color);
 /* Plots a line from (x0,y0) to (x1,y1) */
-void glcd_plotline(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint32_t color);
+void glcd_plotline(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, glcd_color_t color);
 
 /* Plot a character using the standard font */
-void glcd_plotchar(uint16_t x, uint16_t y, uint8_t c, uint32_t color, uint32_t bg);
+void glcd_plotchar(uint16_t x, uint16_t y, uint8_t c, glcd_color_t color, glcd_color_t bg);
 /* Plot a string using the standard font. Special characters are rendered using the font
  * and are not processed special. A \0 terminates the string. */
-void glcd_plotstring(uint16_t x, uint16_t y, char str[], uint32_t color, uint32_t bg, glcd_spacing_t spacing);
+void glcd_plotstring(uint16_t x, uint16_t y, char str[], glcd_color_t color, glcd_color_t bg, glcd_spacing_t spacing);
 
 /* Plot shapes */
-void glcd_plotrect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint32_t color);
-void glcd_plotrectfill(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint32_t color);
-void glcd_plotcircle(uint16_t x0, uint16_t y0, uint16_t r, uint32_t color);
+void glcd_plotrect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, glcd_color_t color);
+void glcd_plotrectfill(uint16_t x, uint16_t y, uint16_t w, uint16_t h, glcd_color_t color);
+void glcd_plotcircle(uint16_t x0, uint16_t y0, uint16_t r, glcd_color_t color);
+#ifdef GLCD_USE_ARC
+void glcd_plotarc(uint16_t xc, uint16_t yc, uint16_t r, float start, float stop, glcd_color_t color);
+#endif
 
 /* Plot a two-color bitmap on the screen */
-void glcd_plotbitmap(uint16_t x, uint16_t y, const uint8_t bitmap[], uint16_t w, uint16_t h, uint32_t color, uint32_t bg);
+void glcd_plotbitmap(uint16_t x, uint16_t y, const uint8_t bitmap[], uint16_t w, uint16_t h, glcd_color_t color, glcd_color_t bg);
 
 /* Turn display inversion on or off */
 void glcd_inversion(glcd_display_inversion_t what);
-
 /* Turn idle mode on or off */
 void glcd_idle(glcd_display_idle_t what);
-
 /* Turn display on or off */
 void glcd_display(glcd_display_t what);
 
+#ifdef GLCD_USE_FLOOD_FILL
 /* Flood fill an object */
-//void glcd_floodfill(uint16_t x,uint16_t y, uint32_t fillColor, uint32_t defaultColor);
+#ifndef GLCD_STACK_SIZE
+#define GLCD_STACK_SIZE (2000)
+#endif
+void glcd_floodfill(uint16_t xs,uint16_t ys, glcd_color_t fillColor, glcd_color_t defaultColor);
+#endif
+
+/* Scroll the screen up vertical (software) */
+void glcd_scrollvertical(uint16_t lines);
+
+/* Hardware scroll not implemented */
+//void glcd_scroll_row();
+
+/* Printing character on console based output */
+void glcd_putchar(char c);
+/* Printing a string on console bases output */
+void glcd_printconsole(char str[]);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* INC_GLCD_ILI9341_STM32_H_ */

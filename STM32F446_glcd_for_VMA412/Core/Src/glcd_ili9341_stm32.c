@@ -1,5 +1,5 @@
 /*
- * Routines for using the VMA412 touchscreen Graphic LCD
+ * Routines for using the Velleman VMA412 touchscreen Graphic LCD
  *
  * Note: pin assignment for STM32F446 Nucleo Board
  *
@@ -7,8 +7,8 @@
 
 Software License Agreement (BSD License)
 
-Version: 0.1
-Date: 2020/03/03
+Version: 0.2
+Date: 2020/06/29
 
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
@@ -38,6 +38,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
  */
 
+
 #if !defined(STM32F446xx) && !defined(STM32F411xx)
 #warning !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #warning ! Only tested with STM32F446 Nucleo Board !
@@ -46,49 +47,68 @@ POSSIBILITY OF SUCH DAMAGE.
 #endif
 
 #include <stdlib.h>
+#include <math.h>
 #include "main.h"
 #include "glcd_ili9341_stm32.h"
 
-/* How to use the CS pin */
-typedef enum {LCD_CS_TO_HIGH, LCD_CS_KEEP_LOW, LCD_CS_TOGGLE} glcd_cs_t;
-typedef enum {LCD_KEEP_DATA_OUTPUT, LCD_MAKE_DATA_INPUT} glcd_dir_t;
-
 /* Special to signal a delay in ms */
-#define GLCD_DELAY 0x0100
+/* Take any 8 bit value that is NOT assigned to a register address */
+/* For the ILI9341 0xFF is a good value, since it is not a valid register address */
+#define GLCD_DELAY 0xFF
 
 /* Port address and bit number for pins */
 typedef struct {
 	GPIO_TypeDef *pGPIO;
-	uint32_t pin;
+	const uint32_t pin;
+	const uint32_t pin_shift;
+	const uint32_t pin_shift16;
 } PortBit;
 
-/* GPIO A, B, C USED */
+/* GPIO A(1), B(2), C(4) USED */
 static const uint32_t GLCD_GPIO_USED = 7;
 
 /* The command pins for STM32F446 Nucleo */
-static const PortBit GLCD_RST = {GPIOC, 1};
-static const PortBit GLCD_CS = {GPIOB, 0};
-static const PortBit GLCD_RS = {GPIOA, 4};
-static const PortBit GLCD_WR = {GPIOA, 1};
-static const PortBit GLCD_RD = {GPIOA, 0};
+/*                   Pin         Port   Pin Low   High */
+static const PortBit GLCD_RST = {GPIOC, 1,  1<<1, 1<<(1+16)};
+static const PortBit GLCD_CS  = {GPIOB, 0,  1<<0, 1<<(0+16)};
+static const PortBit GLCD_RS  = {GPIOA, 4,  1<<4, 1<<(4+16)};
+static const PortBit GLCD_WR  = {GPIOA, 1,  1<<1, 1<<(1+16)};
+static const PortBit GLCD_RD  = {GPIOA, 0,  1<<0, 1<<(0+16)};
 
 /* The data pins for STM32F446 Nucleo */
 static const PortBit GLCD_D[] = {
-	{GPIOA, 9}, /* databit 0 */
-	{GPIOC, 7},
-	{GPIOA, 10},
-	{GPIOB, 3},
-	{GPIOB, 5},
-	{GPIOB, 4},
-	{GPIOB, 10},
-	{GPIOA, 8}  /* databit 7 */
+/*   Port   Pin Low    High */
+	{GPIOA, 9,  1<<9,  1<<(9+16)}, /* databit 0 */
+	{GPIOC, 7,  1<<7,  1<<(7+16)},
+	{GPIOA, 10, 1<<10, 1<<(10+16)},
+	{GPIOB, 3,  1<<3,  1<<(3+16)},
+	{GPIOB, 5,  1<<5,  1<<(5+16)},
+	{GPIOB, 4,  1<<4,  1<<(4+16)},
+	{GPIOB, 10, 1<<10, 1<<(10+16)},
+	{GPIOA, 8,  1<<8,  1<<(8+16)}  /* databit 7 */
 };
 
-/* Internal data array for one row */
+#ifdef GLCD_USE_FLOOD_FILL
+/* Flood fill an object */
+static uint32_t glcd_stack[GLCD_STACK_SIZE];
+static int glcd_sp = 0;
+#ifdef GLCD_USE_FLOOD_FILL_PRINT_IF_STACK_OVERFLOW
+static int glcd_print_once = 0;
+#endif
+#endif
+
+/* Internal data array for one screen row + one byte */
 /* Since the STM32Fs have more RAM than ATmegas, we use an internal
- * buffer to create one row of pixel data at a time
+ * buffer to create one row of pixel data at a time.
+ * Also used to write commands and read data.
+ * Since a read (0x2e) creates a dummy after the command is sent,
+ * there is one byte more needed to read in a whole screen row.
  */
-static uint16_t glcd_data[3*320];
+static glcd_buffer_t glcd_data[3*GLCD_WIDTH+1];
+
+/* The width and the height of the display */
+static uint16_t glcd_width = GLCD_WIDTH;
+static uint16_t glcd_height = GLCD_HEIGHT;
 
 /* Standard 5x7 font from AdaFruit */
 static const uint8_t glcd_font[] = {
@@ -207,7 +227,7 @@ static const uint8_t glcd_font[] = {
     0x3C, 0x00, 0x00, 0x00, 0x00, 0x00 // #255 NBSP
 };
 
-static const uint16_t ILI9341_regValues_stm32[] = {  // from MCUFRIEND_kbv, adapted
+static const glcd_buffer_t ILI9341_regValues_stm32[] = {  // from MCUFRIEND_kbv, adapted
 	0x01, 0,            // software reset
 	GLCD_DELAY, 150,  // 5ms if awake,  125ms if asleep.
 	0xCB, 5, 0x39, 0x2C, 0x00, 0x34, 0x02,      //Power Control A [39 2C 00 34 02]
@@ -216,7 +236,7 @@ static const uint16_t ILI9341_regValues_stm32[] = {  // from MCUFRIEND_kbv, adap
 	0xEA, 2, 0x00, 0x00,        //Driver Timing B [66 00]
 	0xED, 4, 0x64, 0x03, 0x12, 0x81,    //Power On Seq [55 01 23 01]
 	0xF7, 1, 0x20,      //Pump Ratio [10]
-	0xC0, 1, 0x23,      //Power Control 1 [26]
+	0xC0, 1, 0x23,      //Power Control 1 [26] ?? 4.60 V?
 	0xC1, 1, 0x10,      //Power Control 2 [00]
 	0xC5, 2, 0x3E, 0x28,        //VCOM 1 [31 3C]
 	0xC7, 1, 0x86,      //VCOM 2 [C0]
@@ -229,7 +249,7 @@ static const uint16_t ILI9341_regValues_stm32[] = {  // from MCUFRIEND_kbv, adap
 	0xE1, 15, 0x00, 0x0e, 0x14, 0x03, 0x11, 0x07, 0x31, 0xC1, 0x48, 0x08, 0x0f, 0x0c, 0x31, 0x36, 0x0f,
 	0x2B, 4, 0x00, 0x00, 0x00, 0xef, // x/y swapped, set up screen size
 	0x2A, 4, 0x00, 0x00, 0x01, 0x3f, // x/y swapped, set up screen size
-	//0x53, 1, 0x2c, //  backlight, dimming, brightness control on
+	0x53, 1, 0x28, //  backlight, dimming, brightness control on
 	0x11, 0,            //Sleep Out
 	GLCD_DELAY, 150,
 	0x29, 0,            //Display On
@@ -424,12 +444,12 @@ static uint32_t ns100;
  */
 static void glcd_delay_init(void) {
 	SystemCoreClockUpdate();
-	prems = SystemCoreClock/3000UL+1UL;
-	preus = SystemCoreClock/3000000UL+1UL;
-	ns100 = SystemCoreClock/60000000UL+1UL;
+	prems = SystemCoreClock/3000UL+1UL;     /* factor for ms delay */
+	preus = SystemCoreClock/3000000UL+1UL;  /* factor for us delay */
+	ns100 = SystemCoreClock/30000000UL+1UL; /* factor for 100 ns delay */
 }
 
-/* Function glcd_delay_us
+/* Function glcd_delay_ms
  * Creates a delay for the GLCD functions
  * @private
  * @in: delay --> delay in millisecs
@@ -455,6 +475,8 @@ void glcd_delay_ms(uint32_t delay) {
  * @in: delay --> delay in microsecs
  * @out: void
  */
+/* This function is not used */
+__attribute__((unused))
 static void glcd_delay_us(uint32_t delay) {
 
 	uint32_t us = preus*delay;
@@ -471,30 +493,47 @@ static void glcd_delay_us(uint32_t delay) {
 
 /* Function glcd_delay_halfus
  * Creates a 100 ns delay for the GLCD write functions
+ * Tweakable
  * @private
  * @in: none
  * @out: void
  */
 static void glcd_delay_halfus(void) {
 
-	uint32_t us = ns100;
+	uint32_t ns = ns100;
 
-	asm volatile ("mov r3, %[us] \n\t"
+	asm volatile ("mov r3, %[ns] \n\t"
 				  ".Lglcdhu%=: \n\t"
 				  "subs r3, #1 \n\t"
 				  "bne .Lglcdhu%= \n\t"
                   :
-                  : [us] "r" (us)
+                  : [ns] "r" (ns)
                   : "r3", "cc"
 				 );
 }
 
+/* Function glcd_set_write_pulse_delay
+ * Sets the delay (width) of the write pulse
+ * @public
+ * @in: delay --> delay in 3 clock pulses
+ * @out: void
+ */
+void glcd_set_write_pulse_delay(uint32_t delay) {
+	ns100 = delay;
+}
 
 /*
  * ILI9341 low level interface routines
  */
 
-static void glcd_reset(void) {
+
+/* Function glcd_reset
+ * Generates a hardware reset of the GLCD
+ * @private
+ * @in: none
+ * @out: void
+ */
+static void glcd_hardware_reset(void) {
 	  /* Set RST pin low (active) */
 	  (GLCD_RST.pGPIO)->BSRR = (1<<(GLCD_RST.pin+16));
 
@@ -506,14 +545,19 @@ static void glcd_reset(void) {
 
 	  /* Wait a bit */
 	  glcd_delay_ms(150);
-	  /* Just small delay to keep the compiler from complaining */
-	  glcd_delay_us(1);
 }
 
+/* Function glcd_init_pins
+ * Set up the pins used with the GLCD
+ * @private
+ * @in: none
+ * @out: void
+ */
 static void glcd_init_pins(void) {
 
 	/* Enable IO port A, B, C Clocks */
-	/* Should be done by a routine thats reads the GPIOs from all the PortBit variables and makes an OR mask*/
+	/* Should be done by a routine thats reads the GPIOs
+	 * from all the PortBit variables and makes an OR mask*/
 	RCC->AHB1ENR &= ~GLCD_GPIO_USED;
 	RCC->AHB1ENR |= GLCD_GPIO_USED;
 
@@ -548,8 +592,16 @@ static void glcd_init_pins(void) {
 	(GLCD_WR.pGPIO)->BSRR = (1<<(GLCD_WR.pin));
 }
 
+/* Function glcd_write_command
+ * Writes a command to the GLCD
+ * @public
+ * @in: cmd  -- the command
+ * @in: what -- how to use the CS pin
+ * @in: dir  -- set the direction of the data bus after write
+ * @out: void
+ */
 void glcd_write_command(uint16_t cmd, glcd_cs_t what, glcd_dir_t dir) {
-	uint16_t i;
+	register uint16_t i;
 
 	/* Populate data bits */
 	for (i=0; i<8; i++) {
@@ -567,7 +619,7 @@ void glcd_write_command(uint16_t cmd, glcd_cs_t what, glcd_dir_t dir) {
 	/* Command select */
 	(GLCD_RS.pGPIO)->BSRR = (1<<(GLCD_RS.pin+16));
 	/* Chip Select enable */
-	if (what == LCD_CS_KEEP_LOW || what == LCD_CS_TOGGLE) {
+	if (what == GLCD_CS_KEEP_LOW || what == GLCD_CS_TOGGLE) {
 		(GLCD_CS.pGPIO)->BSRR = (1<<(GLCD_CS.pin+16));
 	}
 
@@ -580,12 +632,12 @@ void glcd_write_command(uint16_t cmd, glcd_cs_t what, glcd_dir_t dir) {
 	(GLCD_WR.pGPIO)->BSRR = (1<<(GLCD_WR.pin));
 
 	/* Chip Select disable */
-	if (what == LCD_CS_TO_HIGH || what == LCD_CS_TOGGLE) {
+	if (what == GLCD_CS_TO_HIGH || what == GLCD_CS_TOGGLE) {
 		(GLCD_CS.pGPIO)->BSRR = (1<<(GLCD_CS.pin));
 	}
 	/* Wait */
 
-	if (dir == LCD_MAKE_DATA_INPUT) {
+	if (dir == GLCD_MAKE_DATA_INPUT) {
 		/* Data pins input */
 		for (i=0; i<8; i++) {
 			(GLCD_D[i].pGPIO)->MODER &= ~(3<<(GLCD_D[i].pin<<1));
@@ -593,62 +645,201 @@ void glcd_write_command(uint16_t cmd, glcd_cs_t what, glcd_dir_t dir) {
 	}
 }
 
-void glcd_read_terminate(uint16_t cmd, uint16_t amount, uint16_t data[]) {
-	uint16_t i, j, effe, temp;
+/* Function glcd_read_terminate
+ * Read data from the GLCD and terminate read
+ * @public
+ * @in: cmd    -- the command
+ * @in: amount -- how many bytes are read
+ * @in: data   -- the buffer with fetched info
+ * @out: void
+ */
+void glcd_read_terminate(uint16_t cmd, uint16_t amount, glcd_buffer_t data[]) {
+	//register uint16_t i;
+	volatile register  uint16_t j;
+	/* Leave effe and temp to 16 bits, because access to the address MUST be 16 bits!~*/
+	register uint16_t effe;
+	register uint16_t temp;
+	/* A pointer to the data is more efficient */
+	register glcd_buffer_t *pdata;
+	register PortBit *pGLCDD;
 
-	glcd_write_command(cmd, LCD_CS_KEEP_LOW, LCD_MAKE_DATA_INPUT);
+	glcd_write_command(cmd, GLCD_CS_KEEP_LOW, GLCD_MAKE_DATA_INPUT);
 
 	/* Data select */
-	(GLCD_RS.pGPIO)->BSRR = (1<<(GLCD_RS.pin));
+	(GLCD_RS.pGPIO)->BSRR = GLCD_RS.pin_shift;
 
-	for (j=0; j<amount; j++) {
+	//for (pdata = data, j=0; j<amount; pdata++, j++) {
+	for (pdata = data, j=amount; j>0; pdata++, j--) {
 		/* Read enable */
-		/* Due to the nature of the read, a delay is not needed */
-		(GLCD_RD.pGPIO)->BSRR = (1<<(GLCD_RD.pin+16));
+		(GLCD_RD.pGPIO)->BSRR = GLCD_RD.pin_shift16;
+
+#ifdef __OPTIMIZE__
+		/* Wait a bit for data bits to be stabilized after READ is asserted */
+		/* Seems to be needed with flood fill */
+		glcd_delay_halfus();
+#endif
+
 		effe=0;
-		for (i=0; i<8; i++) {
-			temp = (GLCD_D[i]).pGPIO->IDR & (1<<GLCD_D[i].pin);
-			effe = effe | (temp ? (1<<i) : 0);
-		}
-		data[j] = effe;
+		pGLCDD = GLCD_D;
+//		for (i=0; i<8; i++) {
+//			temp = (GLCD_D[i]).pGPIO->IDR & (GLCD_D[i].pin_shift);
+//			effe = effe | (temp ? (1<<i) : 0);
+//		}
+		temp = pGLCDD->pGPIO->IDR & pGLCDD->pin_shift; effe |= temp ?   1 : 0; pGLCDD++;
+		temp = pGLCDD->pGPIO->IDR & pGLCDD->pin_shift; effe |= temp ?   2 : 0; pGLCDD++;
+		temp = pGLCDD->pGPIO->IDR & pGLCDD->pin_shift; effe |= temp ?   4 : 0; pGLCDD++;
+		temp = pGLCDD->pGPIO->IDR & pGLCDD->pin_shift; effe |= temp ?   8 : 0; pGLCDD++;
+		temp = pGLCDD->pGPIO->IDR & pGLCDD->pin_shift; effe |= temp ?  16 : 0; pGLCDD++;
+		temp = pGLCDD->pGPIO->IDR & pGLCDD->pin_shift; effe |= temp ?  32 : 0; pGLCDD++;
+		temp = pGLCDD->pGPIO->IDR & pGLCDD->pin_shift; effe |= temp ?  64 : 0; pGLCDD++;
+		temp = pGLCDD->pGPIO->IDR & pGLCDD->pin_shift; effe |= temp ? 128 : 0; pGLCDD++;
+
+		*pdata = (glcd_buffer_t) effe;
 		/* Read disable*/
-		(GLCD_RD.pGPIO)->BSRR = (1<<(GLCD_RD.pin));
+		(GLCD_RD.pGPIO)->BSRR = GLCD_RD.pin_shift;
 	}
 
 	/* Terminate read from GLCD */
-	glcd_write_command(0x00, LCD_CS_TO_HIGH, LCD_KEEP_DATA_OUTPUT);
+	glcd_write_command(0x00, GLCD_CS_TO_HIGH, GLCD_KEEP_DATA_OUTPUT);
 }
 
-void glcd_write(uint16_t cmd, uint16_t amount, const uint16_t data[]) {
-	uint16_t i, j;
+/* Function glcd_write
+ * Write data to the GLCD
+ * @public
+ * @in: cmd    -- the command
+ * @in: amount -- how many bytes are written
+ * @in: data   -- the buffer with info
+ * @out: void
+ */
+/* Speed up implementation, use of the register keyword make the compiler
+ * create smaller/faster code footprint */
+void glcd_write(uint16_t cmd, uint16_t amount, const glcd_buffer_t data[]) {
+	register uint32_t j;
+	register PortBit *pGLCDD;
+	register glcd_buffer_t *pdata;
+	/* Next one should be volatile to make it work, to keep the
+	 * execution of statements in sequence */
+	volatile register uint32_t *pwrBSRR = &(GLCD_WR.pGPIO->BSRR);
+    const uint32_t wrpin_en = GLCD_WR.pin_shift16;
+    const uint32_t wrpin_dis = GLCD_WR.pin_shift;
 
 	/* Write the command, keep CS low and keep data pins as output */
-	glcd_write_command(cmd, LCD_CS_KEEP_LOW, LCD_KEEP_DATA_OUTPUT);
+	glcd_write_command(cmd, GLCD_CS_KEEP_LOW, GLCD_KEEP_DATA_OUTPUT);
 	/* Data select */
 	(GLCD_RS.pGPIO)->BSRR = (1<<(GLCD_RS.pin));
 
-	for (j=0; j<amount; j++) {
-		for (i=0; i<8; i++) {
-			if (data[j] & (1<<i)) {
-				(GLCD_D[i].pGPIO)->BSRR = (1<<(GLCD_D[i].pin));
-			} else {
-				(GLCD_D[i].pGPIO)->BSRR = (1<<(GLCD_D[i].pin+16));
-			}
+	for (pdata = data, j=0; j<amount; pdata++, j++) {
+		/* A lot of code, but it makes the speed of the program greater */
+		/* We have unrolled the 8-times loop, and use a pointer to the
+		 * structures with information on the hardware pins. pGLCDD is
+		 * a pointer that jumps from GLCD_D[0] to GLCD_D[7]. This way
+		 * there's no need to compute the complete address of BSRR every
+		 * time. pdata is a pointer to the data array. Incrementing the
+		 * pointer is more efficient that fetching an array element. In
+		 * most cases...
+		 */
+		/* Set pointer to first data bit */
+		pGLCDD = &(GLCD_D[0]);
+		if (*pdata & 0x01) {
+			(pGLCDD->pGPIO)->BSRR = pGLCDD->pin_shift;
+		} else {
+			(pGLCDD->pGPIO)->BSRR = pGLCDD->pin_shift16;
 		}
+        pGLCDD++;
+		if (*pdata & 0x02) {
+			(pGLCDD->pGPIO)->BSRR = pGLCDD->pin_shift;
+		} else {
+			(pGLCDD->pGPIO)->BSRR = pGLCDD->pin_shift16;
+		}
+        pGLCDD++;
+		if (*pdata & 0x04) {
+			(pGLCDD->pGPIO)->BSRR = pGLCDD->pin_shift;
+		} else {
+			(pGLCDD->pGPIO)->BSRR = pGLCDD->pin_shift16;
+		}
+        pGLCDD++;
+		if (*pdata & 0x08) {
+			(pGLCDD->pGPIO)->BSRR = pGLCDD->pin_shift;
+		} else {
+			(pGLCDD->pGPIO)->BSRR = pGLCDD->pin_shift16;
+		}
+        pGLCDD++;
+		if (*pdata & 0x10) {
+			(pGLCDD->pGPIO)->BSRR = pGLCDD->pin_shift;
+		} else {
+			(pGLCDD->pGPIO)->BSRR = pGLCDD->pin_shift16;
+		}
+        pGLCDD++;
+		if (*pdata & 0x20) {
+			(pGLCDD->pGPIO)->BSRR = pGLCDD->pin_shift;
+		} else {
+			(pGLCDD->pGPIO)->BSRR = pGLCDD->pin_shift16;
+		}
+        pGLCDD++;
+		if (*pdata & 0x40) {
+			(pGLCDD->pGPIO)->BSRR = pGLCDD->pin_shift;
+		} else {
+			(pGLCDD->pGPIO)->BSRR = pGLCDD->pin_shift16;
+		}
+        pGLCDD++;
+		if (*pdata & 0x80) {
+			(pGLCDD->pGPIO)->BSRR = pGLCDD->pin_shift;
+		} else {
+			(pGLCDD->pGPIO)->BSRR = pGLCDD->pin_shift16;
+		}
+
 		/* Write enable */
-		(GLCD_WR.pGPIO)->BSRR = (1<<(GLCD_WR.pin+16));
+		*pwrBSRR = wrpin_en;
 		glcd_delay_halfus();
 		/* Write disable*/
-		(GLCD_WR.pGPIO)->BSRR = (1<<(GLCD_WR.pin));
+		*pwrBSRR = wrpin_dis;
 	}
 	/* Note: glcd_write does not terminate the transfer */
 }
 
+/* Original implementation */
+//void glcd_write(uint16_t cmd, uint16_t amount, const uint16_t data[]) {
+//	uint16_t i, j;
+//
+//	/* Write the command, keep CS low and keep data pins as output */
+//	glcd_write_command(cmd, LCD_CS_KEEP_LOW, LCD_KEEP_DATA_OUTPUT);
+//	/* Data select */
+//	(GLCD_RS.pGPIO)->BSRR = (1<<(GLCD_RS.pin));
+//
+//	for (j=0; j<amount; j++) {
+//		for (i=0; i<8; i++) {
+//			if (data[j] & (1<<i)) {
+//				(GLCD_D[i].pGPIO)->BSRR = (1<<(GLCD_D[i].pin));
+//			} else {
+//				(GLCD_D[i].pGPIO)->BSRR = (1<<(GLCD_D[i].pin+16));
+//			}
+//		}
+//		/* Write enable */
+//		(GLCD_WR.pGPIO)->BSRR = (1<<(GLCD_WR.pin+16));
+//		glcd_delay_halfus();
+//		/* Write disable*/
+//		(GLCD_WR.pGPIO)->BSRR = (1<<(GLCD_WR.pin));
+//	}
+//	/* Note: glcd_write does not terminate the transfer */
+//}
+
+/* Function glcd_terminate_write
+ * Terminates a write
+ * @public
+ * @in: void
+ * @out: void
+ */
 void glcd_terminate_write(void) {
 	/* Terminate write to GLCD */
-	glcd_write_command(0x00, LCD_CS_TO_HIGH, LCD_KEEP_DATA_OUTPUT);
+	glcd_write_command(0x00, GLCD_CS_TO_HIGH, GLCD_KEEP_DATA_OUTPUT);
 }
 
+/* Function glcd_init
+ * Initializes the GLCD
+ * @public
+ * @in: void
+ * @out: void
+ */
 void glcd_init(void) {
 	uint16_t init_table_size = sizeof(ILI9341_regValues_stm32) / sizeof(ILI9341_regValues_stm32[0]);
 	uint16_t i;
@@ -660,8 +851,8 @@ void glcd_init(void) {
 	glcd_delay_ms(150);
 
 	/* Hard reset the GLCD */
-	glcd_reset();
-	/* Initialize control pins, not the data pins, because the can be used for input or output */
+	glcd_hardware_reset();
+	/* Initialize control pins, not the data pins, because they can be used for input or output */
 	glcd_init_pins();
 
 	/* Setup the GLCD */
@@ -682,8 +873,30 @@ void glcd_init(void) {
 /*
  * High level interface routines
  */
+/* Function glcd_setrotation
+ * Sets the rotation of the screen
+ * @public
+ * @in: rot -- the rotation order
+ * @out: void
+ */void glcd_setrotation(glcd_rotation_t rot) {
+	switch (rot) {
+	case GLCD_SCREEN_ROT0: glcd_data[0] = 0xe8; glcd_width = GLCD_WIDTH; glcd_height = GLCD_HEIGHT; break;
+	case GLCD_SCREEN_ROT90: glcd_data[0] = 0x88; glcd_width = GLCD_HEIGHT; glcd_height = GLCD_WIDTH; break;
+	case GLCD_SCREEN_ROT180: glcd_data[0] = 0xbc; glcd_width = GLCD_WIDTH; glcd_height = GLCD_HEIGHT; break;
+	case GLCD_SCREEN_ROT270: glcd_data[0] = 0xc8; glcd_width = GLCD_HEIGHT; glcd_height = GLCD_WIDTH; break;
+	default: glcd_data[0] = 0xe8; break;
+	}
+	glcd_write(0x36, 1, glcd_data);
+}
 
-void glcd_cls(uint32_t color) {
+
+/* Function glcd_cls
+ * Clears the screen to a color
+ * @public
+ * @in: color -- RGB color specification
+ * @out: void
+ */
+void glcd_cls(glcd_color_t color) {
 	register uint16_t i;
 	register uint16_t red = (color>>16)&0xff;
 	register uint16_t green = (color>>8)&0xff;
@@ -694,41 +907,57 @@ void glcd_cls(uint32_t color) {
 	glcd_data[1] = 0x00;
 	glcd_data[2] = 0x01;
 	glcd_data[3] = 0x3f;
-	glcd_write(0x2a, 4, glcd_data);
+	glcd_write(glcd_width>glcd_height ? 0x2a : 0x2b, 4, glcd_data);
 
 	//0x2B, reset y position to full height
 	glcd_data[2] = 0x00;
 	glcd_data[3] = 0xef;
-	glcd_write(0x2b, 4, glcd_data);
+	glcd_write(glcd_width<glcd_height ? 0x2a : 0x2b, 4, glcd_data);
 
 
 	/* Populate array */
-	for (i=0; i<3*320; i=i+3) {
+	for (i=0; i<3*glcd_width; i=i+3) {
 		glcd_data[i]   = red;
 		glcd_data[i+1] = green;
 		glcd_data[i+2] = blue;
 	}
 
 	/* Write to screen */
-	glcd_write(0x2c, 3*320, glcd_data);
-	for (i=0; i<239; i++) {
-		glcd_write(0x3c, 3*320, glcd_data);
+	glcd_write(0x2c, 3*glcd_width, glcd_data);
+	for (i=0; i<glcd_height-1; i++) {
+		glcd_write(0x3c, 3*glcd_width, glcd_data);
 	}
 }
 
-void glcd_plotpixel(uint16_t x, uint16_t y, uint32_t color) {
+/* Function glcd_plotpixel
+ * Plots a pixel on the GLCD, no checks
+ * @public
+ * @in: x  -- the x coordinate
+ * @in: y  -- the y coordinate
+ * @in: color -- the RGB color specification
+ * @out: void
+ */
+void glcd_plotpixel(uint16_t x, uint16_t y, glcd_color_t color) {
+
+	if (x>=glcd_width) {
+		return;
+	}
+	if (y>=glcd_height) {
+		return;
+	}
+
 	//0x2A, x position
 	glcd_data[0] = x>>8;
 	glcd_data[1] = x&0xff;
-	glcd_data[2] = 0x01;
-	glcd_data[3] = 0x3f;
+	glcd_data[2] = ((glcd_width-1)>>8)&0xff; //0x01;
+	glcd_data[3] = (glcd_width-1)&0xff; //0x3f;
 	glcd_write(0x2a, 4, glcd_data);
 
 	//0x2B, y position
-	glcd_data[0] = 0x00;
+	glcd_data[0] = y>>8;
 	glcd_data[1] = y&0xff;
-	glcd_data[2] = 0x00;
-	glcd_data[3] = 0xef;
+	glcd_data[2] = ((glcd_height-1)>>8)&0xff; //0x00;
+	glcd_data[3] = (glcd_height-1)&0xff; //0xef;
 	glcd_write(0x2b, 4, glcd_data);
 
 	/* Plot pixel */
@@ -738,57 +967,89 @@ void glcd_plotpixel(uint16_t x, uint16_t y, uint32_t color) {
 	glcd_write(0x2c, 3, glcd_data);
 }
 
-uint32_t glcd_readpixel(uint16_t x, uint16_t y) {
+/* Function glcd_readpixel
+ * Reads pixel info from the GLCD, no checks
+ * @public
+ * @in: x  -- the x coordinate
+ * @in: y  -- the y coordinate
+ * @out: color -- the RGB color specification
+ */
+glcd_color_t glcd_readpixel(uint16_t x, uint16_t y) {
 	//0x2A, x position
 	glcd_data[0] = x>>8;
 	glcd_data[1] = x&0xff;
-	glcd_data[2] = 0x01;
-	glcd_data[3] = 0x3f;
+	glcd_data[2] = ((glcd_width-1)>>8)&0xff; //0x01;
+	glcd_data[3] = (glcd_width-1)&0xff; //0x3f;
 	glcd_write(0x2a, 4, glcd_data);
 
 	//0x2B, y position
-	glcd_data[0] = 0x00;
+	glcd_data[0] = y>>8;
 	glcd_data[1] = y&0xff;
-	glcd_data[2] = 0x00;
-	glcd_data[3] = 0xef;
+	glcd_data[2] = ((glcd_height-1)>>8)&0xff; //0x00;
+	glcd_data[3] = (glcd_height-1)&0xff; //0xef;
 	glcd_write(0x2b, 4, glcd_data);
 
 	/* Read pixel */
 	glcd_read_terminate(0x2e, 4, glcd_data);
+	/* Need cast to glcd_color_t */
 	return (glcd_data[1]<<16) + (glcd_data[2]<<8) + glcd_data[3];
 }
 
-void glcd_plothorizontalline(uint16_t x, uint16_t y, uint16_t w, uint32_t color) {
-	uint16_t i;
+/* Function glcd_plothorizontalline
+ * Plots a horizontal line, with checks
+ * @public
+ * @in: x  -- the x coordinate
+ * @in: y  -- the y coordinate
+ * @in: w  -- the width of the line
+ * @in: color -- the RGB color specification
+ * @out: void
+ */
+void glcd_plothorizontalline(uint16_t x, uint16_t y, uint16_t w, glcd_color_t color) {
+
+	register uint16_t i;
+	register uint16_t red, green, blue;
+
+	red   = (color>>16)&0xff;
+	green = (color>>8)&0xff;
+	blue  = (color>>0)&0xff;
 
 	//0x2A, x position
 	glcd_data[0] = x>>8;
 	glcd_data[1] = x&0xff;
-	glcd_data[2] = 0x01;
-	glcd_data[3] = 0x3f;
+	glcd_data[2] = ((glcd_width-1)>>8)&0xff; //0x01;
+	glcd_data[3] = (glcd_width-1)&0xff; //0x3f;
 	glcd_write(0x2a, 4, glcd_data);
 
 	//0x2B, y position
-	glcd_data[0] = 0x00;
+	glcd_data[0] = y>>8;
 	glcd_data[1] = y&0xff;
-	glcd_data[2] = 0x00;
-	glcd_data[3] = 0xef;
+	glcd_data[2] = ((glcd_height-1)>>8)&0xff; //0x00;
+	glcd_data[3] = (glcd_height-1)&0xff; //0xef;
 	glcd_write(0x2b, 4, glcd_data);
 
-	if (x+w>320) {
-		w=320-x;
+	if (x+w>glcd_width) {
+		w=glcd_width-x;
 	}
 	/* Create color */
 	for (i=0; i<3*w; i=i+3) {
-		glcd_data[i] = (color>>16)&0xff;
-		glcd_data[i+1] = (color>>8)&0xff;
-		glcd_data[i+2] = (color>>0)&0xff;
+		glcd_data[i] = red;
+		glcd_data[i+1] = green;
+		glcd_data[i+2] = blue;
 	}
 	glcd_write(0x2c, 3*w, glcd_data);
 }
 
-void glcd_plotverticalline(uint16_t x, uint16_t y, uint16_t h, uint32_t color) {
-	uint16_t i;
+/* Function glcd_plotverticalline
+ * Plots a vertical line, with checks
+ * @public
+ * @in: x  -- the x coordinate
+ * @in: y  -- the y coordinate
+ * @in: w  -- the width of the line
+ * @in: color -- the RGB color specification
+ * @out: void
+ */
+void glcd_plotverticalline(uint16_t x, uint16_t y, uint16_t h, glcd_color_t color) {
+	register uint16_t i;
 
 	//0x2A, x position
 	// Make x position one pixel wide, so it will print vertical
@@ -799,14 +1060,14 @@ void glcd_plotverticalline(uint16_t x, uint16_t y, uint16_t h, uint32_t color) {
 	glcd_write(0x2a, 4, glcd_data);
 
 	//0x2B, y position
-	glcd_data[0] = 0x00;
+	glcd_data[0] = y>>8;
 	glcd_data[1] = y&0xff;
-	glcd_data[2] = 0x00;
-	glcd_data[3] = 0xef;
+	glcd_data[2] = ((glcd_height-1)>>8)&0xff; //0x00;
+	glcd_data[3] = (glcd_height-1)&0xff; //0xef;
 	glcd_write(0x2b, 4, glcd_data);
 
-	if (y+h>240) {
-		h=240-y;
+	if (y+h>glcd_height) {
+		h=glcd_height-y;
 	}
 	/* Create color */
 	for (i=0; i<3*h; i=i+3) {
@@ -818,12 +1079,22 @@ void glcd_plotverticalline(uint16_t x, uint16_t y, uint16_t h, uint32_t color) {
 }
 
 /* Adapted from the AdaFruit library */
-void glcd_plotchar(uint16_t x, uint16_t y, uint8_t c, uint32_t color, uint32_t bg) {
+/* Function glcd_plotchar, with checks
+ * Plots a character in standard font
+ * @public
+ * @in: x  -- the x coordinate
+ * @in: y  -- the y coordinate
+ * @in: c  -- one of 256 characters
+ * @in: color -- the RGB color specification
+ * @in: bg -- the background RGB color specification
+ * @out: void
+ */
+void glcd_plotchar(uint16_t x, uint16_t y, uint8_t c, glcd_color_t color, glcd_color_t bg) {
 	register uint8_t line;
 	register uint16_t i, j;
 
-	if ((x >= 320) ||           // Clip right
-		(y >= 240))             // Clip bottom
+	if ((x >= glcd_width) ||           // Clip right
+		(y >= glcd_height))             // Clip bottom
 	return;
 
 	for (i = 0; i < 5; i++) { // Char bitmap = 5 columns
@@ -832,35 +1103,63 @@ void glcd_plotchar(uint16_t x, uint16_t y, uint8_t c, uint32_t color, uint32_t b
 			if (line & 1) {
 				glcd_plotpixel(x + i, y + j, color);
 			} else if (bg != color) {
+				/* Plot background color, omit if background color == foreground color */
 				glcd_plotpixel(x + i, y + j, bg);
 			}
 		}
 	}
 }
 
-/* Plots a string to the screen */
-void glcd_plotstring(uint16_t x, uint16_t y, char str[], uint32_t color, uint32_t bg, glcd_spacing_t spacing) {
+/* Function glcd_plotstring
+ * Plots a string to the screen
+ * @public
+ * @in: x  -- the x coordinate
+ * @in: y  -- the y coordinate
+ * @in: str  -- a null terminated string
+ * @in: color -- the RGB color specification
+ * @in: bg -- the background RGB color specification
+ * @in: spacing -- spacing between characters
+ * @out: void
+ */
+void glcd_plotstring(uint16_t x, uint16_t y, char str[], glcd_color_t color, glcd_color_t bg, glcd_spacing_t spacing) {
 	register uint32_t i;
+
+	/* Really, this shouldn't be necessary */
+	if (str == NULL) {
+		return;
+	}
 
 	for (i=0; str[i] != '\0'; i++) {
 		glcd_plotchar(x, y, (uint8_t) str[i], color, bg);
 		x += 4;
 		switch (spacing) {
-			case GLCD_STRING_WIDE:		x++;
-								if (bg != color) {
-									glcd_plotverticalline(x, y, 8, bg);
-								}
-			case GLCD_STRING_NORMAL: 	x++;
-								if (bg != color) {
-									glcd_plotverticalline(x, y, 8, bg);
-								}
+			case GLCD_STRING_WIDE:
+				x++;
+				if (bg != color) {
+					glcd_plotverticalline(x, y, 8, bg);
+				}
+			case GLCD_STRING_NORMAL:
+				x++;
+				if (bg != color) {
+					glcd_plotverticalline(x, y, 8, bg);
+				}
 			case GLCD_STRING_CONDENSED:
 			default: x++;
 		}
 	}
 }
 
-void glcd_plotrectfill(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint32_t color) {
+/* Function glcd_plotrectfill
+ * Plots a filled rectangle
+ * @public
+ * @in: x  -- the x coordinate
+ * @in: y  -- the y coordinate
+ * @in: w  -- width
+ * @in: h  -- height
+ * @in: color -- the RGB color specification
+ * @out: void
+ */
+void glcd_plotrectfill(uint16_t x, uint16_t y, uint16_t w, uint16_t h, glcd_color_t color) {
 	while (h>0) {
 		glcd_plothorizontalline(x, y, w, color);
 		h--;
@@ -868,55 +1167,82 @@ void glcd_plotrectfill(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint32_t 
 	}
 }
 
-void glcd_plotrect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint32_t color) {
+/* Function glcd_plotrect
+ * Plots a rectangle
+ * @public
+ * @in: x  -- the x coordinate
+ * @in: y  -- the y coordinate
+ * @in: w  -- width
+ * @in: h  -- height
+ * @in: color -- the RGB color specification
+ * @out: void
+ */
+void glcd_plotrect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, glcd_color_t color) {
 	glcd_plothorizontalline(x, y, w, color);
 	glcd_plothorizontalline(x, y + h - 1, w, color);
 	glcd_plotverticalline(x, y, h, color);
 	glcd_plotverticalline(x + w - 1, y, h, color);
 }
 
-void glcd_plotpixel_check(uint16_t x, uint16_t y, uint32_t color) {
-
-	if (x>319) {
-		return;
-	}
-	if (y>239) {
-		return;
-	}
-
-	//0x2A, x position
-	glcd_data[0] = x>>8;
-	glcd_data[1] = x&0xff;
-	glcd_data[2] = 0x01;
-	glcd_data[3] = 0x3f;
-	glcd_write(0x2a, 4, glcd_data);
-
-	//0x2B, y position
-	glcd_data[0] = 0x00;
-	glcd_data[1] = y&0xff;
-	glcd_data[2] = 0x00;
-	glcd_data[3] = 0xef;
-	glcd_write(0x2b, 4, glcd_data);
-
-	/* Plot pixel */
-	glcd_data[0] = (color>>16)&0xff;
-	glcd_data[1] = (color>>8)&0xff;
-	glcd_data[2] = (color>>0)&0xff;
-	glcd_write(0x2c, 3, glcd_data);
-}
+/* Function glcd_plotpixel_check
+ * Plots a pixel on the GLCD, with checks
+ * @public
+ * @in: x  -- the x coordinate
+ * @in: y  -- the y coordinate
+ * @in: color -- the RGB color specification
+ * @out: void
+ */
+//void glcd_plotpixel_check(uint16_t x, uint16_t y, glcd_color_t color) {
+//
+//	if (x>=glcd_width) {
+//		return;
+//	}
+//	if (y>=glcd_height) {
+//		return;
+//	}
+//
+//	//0x2A, x position
+//	glcd_data[0] = x>>8;
+//	glcd_data[1] = x&0xff;
+//	glcd_data[2] = ((glcd_width-1)>>8)&0xff; //0x01;
+//	glcd_data[3] = (glcd_width-1)&0xff; //0x3f;
+//	glcd_write(0x2a, 4, glcd_data);
+//
+//	//0x2B, y position
+//	glcd_data[0] = y>>8;
+//	glcd_data[1] = y&0xff;
+//	glcd_data[2] = ((glcd_height-1)>>8)&0xff; //0x00;
+//	glcd_data[3] = (glcd_height-1)&0xff; //0xef;
+//	glcd_write(0x2b, 4, glcd_data);
+//
+//	/* Plot pixel */
+//	glcd_data[0] = (color>>16)&0xff;
+//	glcd_data[1] = (color>>8)&0xff;
+//	glcd_data[2] = (color>>0)&0xff;
+//	glcd_write(0x2c, 3, glcd_data);
+//}
 
 /* Adapted from the AdaFruit library */
-void glcd_plotcircle(uint16_t x0, uint16_t y0, uint16_t r, uint32_t color) {
-	int16_t f = 1 - r;
-	int16_t ddF_x = 1;
-	int16_t ddF_y = -2 * r;
-	int16_t x = 0;
-	int16_t y = r;
+/* Function glcd_plotcircle
+ * Plots a circle on the GLCD, with checks
+ * @public
+ * @in: x  -- the x coordinate
+ * @in: y  -- the y coordinate
+ * @in: r  -- the radius
+ * @in: color -- the RGB color specification
+ * @out: void
+ */
+void glcd_plotcircle(uint16_t x0, uint16_t y0, uint16_t r, glcd_color_t color) {
+	register int16_t f = 1 - r;
+	register int16_t ddF_x = 1;
+	register int16_t ddF_y = -2 * r;
+	register int16_t x = 0;
+	register int16_t y = r;
 
-	glcd_plotpixel_check(x0, y0 + r, color);
-	glcd_plotpixel_check(x0, y0 - r, color);
-	glcd_plotpixel_check(x0 + r, y0, color);
-	glcd_plotpixel_check(x0 - r, y0, color);
+	glcd_plotpixel(x0, y0 + r, color);
+	glcd_plotpixel(x0, y0 - r, color);
+	glcd_plotpixel(x0 + r, y0, color);
+	glcd_plotpixel(x0 - r, y0, color);
 
 	while (x < y) {
 		if (f >= 0) {
@@ -928,20 +1254,33 @@ void glcd_plotcircle(uint16_t x0, uint16_t y0, uint16_t r, uint32_t color) {
 		ddF_x += 2;
 		f += ddF_x;
 
-		glcd_plotpixel_check(x0 + x, y0 + y, color);
-		glcd_plotpixel_check(x0 - x, y0 + y, color);
-		glcd_plotpixel_check(x0 + x, y0 - y, color);
-		glcd_plotpixel_check(x0 - x, y0 - y, color);
-		glcd_plotpixel_check(x0 + y, y0 + x, color);
-		glcd_plotpixel_check(x0 - y, y0 + x, color);
-		glcd_plotpixel_check(x0 + y, y0 - x, color);
-		glcd_plotpixel_check(x0 - y, y0 - x, color);
+		glcd_plotpixel(x0 + x, y0 + y, color);
+		glcd_plotpixel(x0 - x, y0 + y, color);
+		glcd_plotpixel(x0 + x, y0 - y, color);
+		glcd_plotpixel(x0 - x, y0 - y, color);
+		glcd_plotpixel(x0 + y, y0 + x, color);
+		glcd_plotpixel(x0 - y, y0 + x, color);
+		glcd_plotpixel(x0 + y, y0 - x, color);
+		glcd_plotpixel(x0 - y, y0 - x, color);
 	}
 }
 
 /* Adapted from the AdaFruit library */
-void glcd_plotline(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint32_t color) {
-	int16_t steep = abs(y1 - y0) > abs(x1 - x0);
+/* Function glcd_plotline
+ * Plots a line on the GLCD
+ * @public
+ * @in: x0  -- the start x coordinate
+ * @in: y0  -- the start y coordinate
+ * @in: x1  -- the stop x coordinate
+ * @in: y1  -- the stop y coordinate
+ * @in: color -- the RGB color specification
+ * @out: void
+ */
+void glcd_plotline(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, glcd_color_t color) {
+	register int16_t steep = abs(y1 - y0) > abs(x1 - x0);
+	register int16_t dx, dy;
+	register int16_t ystep;
+	register int16_t err;
 
 	if (steep) {
 		glcd_swap_uint16_t(x0, y0);
@@ -953,12 +1292,10 @@ void glcd_plotline(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint32_t 
 		glcd_swap_uint16_t(y0, y1);
 	}
 
-	int16_t dx, dy;
 	dx = x1 - x0;
 	dy = abs(y1 - y0);
 
-	int16_t err = dx / 2;
-	int16_t ystep;
+	err = dx / 2;
 
 	if (y0 < y1) {
 		ystep = 1;
@@ -981,18 +1318,29 @@ void glcd_plotline(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint32_t 
 }
 
 /* Based on the AdaFruit library */
-/* This function plots a 2-color bitmap to the display */
-void glcd_plotbitmap(uint16_t x, uint16_t y, const uint8_t bitmap[], uint16_t w, uint16_t h, uint32_t color, uint32_t bg) {
+/* Function glcd_plotbitmap
+ * Plots a 2-color bitmap to the GLCD
+ * @public
+ * @in: x  -- the start x coordinate
+ * @in: y  -- the start y coordinate
+ * @in: bitmap -- the bitmap of the image, one bit per pixel
+ * @in: w  -- width of the bitmap
+ * @in: h  -- height of the bitmap
+ * @in: color -- the RGB color specification bit == 1
+ * @in: bg -- the RGB color specification bit == 0
+ * @out: void
+ */
+void glcd_plotbitmap(uint16_t x, uint16_t y, const uint8_t bitmap[], uint16_t w, uint16_t h, glcd_color_t color, glcd_color_t bg) {
 
-	uint16_t byteWidth = (w + 7) / 8;
-	uint8_t byte = 0;
+	register uint16_t byteWidth = (w + 7) / 8;
+	register uint8_t byte = 0;
 
-	uint8_t red = (color>>16)&0xff;
-	uint8_t green = (color>>8)&0xff;
-	uint8_t blue = (color>>0)&0xff;
-	uint8_t bred = (bg>>16)&0xff;
-	uint8_t bgreen = (bg>>8)&0xff;
-	uint8_t bblue = (bg>>0)&0xff;
+	register uint8_t red = (color>>16)&0xff;
+	register uint8_t green = (color>>8)&0xff;
+	register uint8_t blue = (color>>0)&0xff;
+	register uint8_t bred = (bg>>16)&0xff;
+	register uint8_t bgreen = (bg>>8)&0xff;
+	register uint8_t bblue = (bg>>0)&0xff;
 
 	/* Special treatment for embedded bitmap */
 	if (bitmap == GLCD_THUAS_DEFAULT_BITMAP) {
@@ -1003,18 +1351,18 @@ void glcd_plotbitmap(uint16_t x, uint16_t y, const uint8_t bitmap[], uint16_t w,
 	}
 
 	for (uint16_t j = 0; j < h; j++, y++) {
-		// Set x position
+		// 0x2A, x position
 		glcd_data[0] = x>>8;
 		glcd_data[1] = x&0xff;
-		glcd_data[2] = 0x01;
-		glcd_data[3] = 0x3f;
+		glcd_data[2] = ((glcd_width-1)>>8)&0xff; //0x01;
+		glcd_data[3] = (glcd_width-1)&0xff; //0x3f;
 		glcd_write(0x2a, 4, glcd_data);
 
-		//Set y position
-		glcd_data[0] = 0x00;
+		//0x2B, y position
+		glcd_data[0] = y>>8;
 		glcd_data[1] = y&0xff;
-		glcd_data[2] = 0x00;
-		glcd_data[3] = 0xef;
+		glcd_data[2] = ((glcd_height-1)>>8)&0xff; //0x00;
+		glcd_data[3] = (glcd_height-1)&0xff; //0xef;
 		glcd_write(0x2b, 4, glcd_data);
 
 		/* Process the image bits */
@@ -1034,35 +1382,330 @@ void glcd_plotbitmap(uint16_t x, uint16_t y, const uint8_t bitmap[], uint16_t w,
 	}
 }
 
+/* Function glcd_inversion
+ * Set GLCD inversion
+ * @public
+ * @in: what  -- enable/disable inversion
+ * @out: void
+ */
 void glcd_inversion(glcd_display_inversion_t what) {
 	glcd_read_terminate((what==GLCD_DISPLAY_INVERSION_ON) ? 0x21 : 0x20, 0, glcd_data);
 }
 
+/* Function glcd_idle
+ * Set GLCD idle
+ * @public
+ * @in: what  -- enable/disable idle
+ * @out: void
+ */
 void glcd_idle(glcd_display_idle_t what) {
 	glcd_read_terminate((what==GLCD_DISPLAY_IDLE_ON) ? 0x39 : 0x38, 0, glcd_data);
 }
 
+/* Function glcd_display
+ * Set GLCD on or off
+ * @public
+ * @in: what  -- enable/disable display
+ * @out: void
+ */
 void glcd_display(glcd_display_t what) {
 	glcd_read_terminate((what==GLCD_DISPLAY_ON) ? 0x29 : 0x28, 0, glcd_data);
 }
 
-/* Flood fill an object */
-/* ONLY WORKS FOR SMALL AREAS */
-/* Because of the recursive behavior of this routine, stack overflow is likely to occur */
-/* Based on https://www.javatpoint.com/computer-graphics-flood-fill-algorithm */
-//void glcd_floodfill(uint16_t x,uint16_t y, uint32_t fillColor, uint32_t defaultColor) {
-//	uint32_t readcol;
+/* Flood fill routines, based on stack oriented flood fill */
+#ifdef GLCD_USE_FLOOD_FILL
+/* Function glcd_stack_push
+ * Push x, y on stack
+ * @private
+ * @in: pixinfo -- x, y pixel info
+ * @out: void
+ */
+static void glcd_stack_push(uint32_t pixinfo) {
+	if (glcd_sp < GLCD_STACK_SIZE) {
+		glcd_stack[glcd_sp++] = pixinfo;
+	} else {
+#ifdef GLCD_USE_FLOOD_FILL_PRINT_IF_STACK_OVERFLOW
+		if (!glcd_print_once) {
+			glcd_print_once = 1;
+			glcd_plotstring(0,48, "Stack overflow during flood fill", GLCD_COLOR_YELLOW, GLCD_COLOR_YELLOW, GLCD_STRING_NORMAL);
+			glcd_plotstring(0,58, "Set GLCD_STACK_SIZE to a higher value", GLCD_COLOR_YELLOW, GLCD_COLOR_YELLOW, GLCD_STRING_NORMAL);
+		}
+#endif
+	}
+}
+
+/* Function glcd_stack_pop
+ * Pop x, y from stack
+ * @private
+ * @in: void
+ * @out: x, y pixel info
+ */
+static uint32_t glcd_stack_pop(void) {
+
+	if (glcd_sp > 0) {
+		return glcd_stack[--glcd_sp];
+    }
+#ifdef GLCD_USE_FLOOD_FILL_PRINT_IF_STACK_OVERFLOW
+	glcd_plotstring(0,48, "Stack underflow during flood fill", GLCD_COLOR_YELLOW, GLCD_COLOR_YELLOW, GLCD_STRING_NORMAL);
+#endif
+	return 0;
+}
+
+/* Based on https://en.wikipedia.org/wiki/Flood_fill */
+/* Function glcd_floodfill
+ * Flood fill an object to the GLCD using a stack
+ * @public
+ * @in: xs  -- the start x coordinate
+ * @in: ys  -- the start y coordinate
+ * @in: fillColor -- the RGB color specification for pixel fill
+ * @in: defaultColor -- the RGB color specification to within boundary
+ *                      any other color will match boundary
+ * @out: void
+ */
+void glcd_floodfill(uint16_t xs,uint16_t ys, glcd_color_t fillColor, glcd_color_t defaultColor) {
+
+	register uint32_t temppop;
+	register uint16_t x, y;
+	/* Need mask because lower 2 bits are always 0 */
+	const register uint32_t bgwithmask = defaultColor&(~0x00030303);
+
+#ifdef GLCD_USE_FLOOD_FILL_PRINT_IF_STACK_OVERFLOW
+	glcd_print_once = 0;
+#endif
+	glcd_stack_push(((uint32_t)xs)<<16|((uint32_t)ys));
+
+	while (glcd_sp>0) {
+		/* Get stack entry */
+		temppop = glcd_stack_pop();
+		x = (temppop >> 16)&0xffff;
+		y = (temppop & 0xffff);
+
+		/* If pixel is the defaultColor */
+		if (glcd_readpixel(x,y)==bgwithmask) {
+			glcd_plotpixel(x,y,fillColor);
+			if (y<319) {
+				if (glcd_readpixel(x,y+1)==bgwithmask) {
+					glcd_stack_push((x<<16)|(y+1));
+				}
+			}
+			if (y>0) {
+				if (glcd_readpixel(x,y-1)==bgwithmask) {
+					glcd_stack_push((x<<16)|(y-1));
+				}
+			}
+			if (x<239) {
+				if (glcd_readpixel(x+1,y)==bgwithmask) {
+					glcd_stack_push(((x+1)<<16)|y);
+				}
+			}
+			if (x>0) {
+				if (glcd_readpixel(x-1,y)==bgwithmask) {
+					glcd_stack_push(((x-1)<<16)|y);
+				}
+			}
+ 		}
+	}
+}
+#endif
+
+/* Function glcd_plotarc
+ * Plots an arc on the GLCD
+ * @public
+ * @in: xc  -- center x
+ * @in: yc  -- center y
+ * @in: r   -- radius
+ * @in: start -- start angle in degrees
+ * @in: stop -- stop angle in degrees
+ * @in: color -- the RGB color specification
+ * @out: void
+ */
+/* glcd_plotarc can be omitted, which saves code for computing sin en cos */
+#ifdef GLCD_USE_ARC
+void glcd_plotarc(uint16_t xc, uint16_t yc, uint16_t r, float start, float stop, glcd_color_t color) {
+	/* Really should be arctan(1/r), but is almost equal for r >> 1 */
+	register float inc_angle = 1.0f / (float)r;
+	register float f;
+	register uint16_t x, y;
+
+	/* Change to radians */
+	start = start / 57.295779513082320876798f;
+    stop = stop / 57.295779513082320876798f;
+
+	for (f = start; f <= stop; f = f + inc_angle) {
+		/* We use sinf and cosf because of the hardware FPU */
+		x = xc + r*cosf(f);
+		y = yc + r*sinf(f);
+		glcd_plotpixel(x, y, color);
+	}
+}
+#endif
+
+/* Function glcd_scroll_vertical
+ * Software based vertical scroll (slow!)
+ * @public
+ * @in: rows  -- number of rows to scroll up
+ * @out: void
+ */
+void glcd_scrollvertical(uint16_t rows) {
+
+	glcd_buffer_t buff2[4];
+
+	for (int y = rows; y < glcd_height; y++) {
+//		//0x2A, x position
+//		buff2[0] = 0x00;
+//		buff2[1] = 0x00;
+//		buff2[2] = 0x01;
+//		buff2[3] = 0x3f;
+//		glcd_write(0x2a, 4, buff2);
 //
-//	if (x>=320 || y>=240) {
-//		return;
-//	}
-//	readcol = glcd_readpixel(x,y);
-//	if (readcol==(defaultColor&(~0x00030303))) {
-//        //delay(1);
-//        glcd_plotpixel(x,y,fillColor);
-//        glcd_floodfill(x+1,y,fillColor,defaultColor);
-//        glcd_floodfill(x-1,y,fillColor,defaultColor);
-//        glcd_floodfill(x,y+1,fillColor,defaultColor);
-//        glcd_floodfill(x,y-1,fillColor,defaultColor);
-//	}
+//		//0x2B, y position
+//		buff2[0] = 0x00;
+//		buff2[1] = yy&0xff;
+//		buff2[2] = 0x00;
+//		buff2[3] = 0xef;
+//		glcd_write(0x2b, 4, buff2);
+
+		// 0x2A, x position
+		glcd_data[0] = 0x00;
+		glcd_data[1] = 0x00;
+		glcd_data[2] = ((glcd_width-1)>>8)&0xff; //0x01;
+		glcd_data[3] = (glcd_width-1)&0xff; //0x3f;
+		glcd_write(0x2a, 4, glcd_data);
+
+		//0x2B, y position
+		glcd_data[0] = y>>8;
+		glcd_data[1] = y&0xff;
+		glcd_data[2] = ((glcd_height-1)>>8)&0xff; //0x00;
+		glcd_data[3] = (glcd_height-1)&0xff; //0xef;
+		glcd_write(0x2b, 4, glcd_data);
+
+
+		/* The first byte after read is dummy value */
+		glcd_read_terminate(0x2e, 3*glcd_width+1, glcd_data);
+
+//		//0x2A, x position
+//		buff2[0] = 0x00;
+//		buff2[1] = 0x00;
+//		buff2[2] = 0x01;
+//		buff2[3] = 0x3f;
+//		glcd_write(0x2a, 4, buff2);
+
+		//0x2B, y position
+		// Note we can not use glcd_data since it is full of pixel data
+		buff2[0] = (y-rows)>>8;
+		buff2[1] = (y-rows)&0xff;
+		buff2[2] = ((glcd_height-1)>>8)&0xff; //0x00;
+		buff2[3] = (glcd_height-1)&0xff; //0xef;
+//		buff2[2] = 0x00;
+//		buff2[3] = 0xef;
+		glcd_write(0x2b, 4, buff2);
+		/* The first byte after read is dummy, so point one byte further */
+		glcd_write(0x2c, 3*glcd_width, glcd_data+1);
+	}
+}
+
+/* Function glcd_putchar
+ * Prints a character on the terminal
+ * @public
+ * @in: c  -- character to print
+ * @out: void
+ * TODO: handling of tabs
+ */
+void glcd_putchar(char c) {
+	static uint16_t xc = 0;
+	static uint16_t yc = 0;
+	/* For now, leave skip at 10 */
+    static uint16_t skip=10;
+
+	/* Formfeed clears the screen */
+    if (c=='\f') {
+		glcd_cls(GLCD_COLOR_BLACK);
+		xc=0;
+		yc=0;
+	/* Carriage return */
+	} else if (c=='\r') {
+		xc=0;
+	/* Backspace */
+	} else if (c=='\b') {
+		if (xc>0) {
+			xc=xc-6;
+			glcd_plotchar(xc, yc, ' ', GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK);
+		}
+	/* Newline returns to begin of next line */
+	} else if (c=='\n') {
+		xc=0;
+		if (yc>=glcd_height-skip) {
+			/* Scroll up one line */
+			glcd_scrollvertical(skip);
+			glcd_plotrectfill(0, glcd_height-skip, glcd_width, skip, GLCD_COLOR_BLACK);
+		} else {
+			/* Just set to new line */
+			yc=yc+skip;
+		}
+	} else {
+		/* Wrap is needed */
+		if (xc>=glcd_width-(glcd_width%6)) {
+			xc=0;
+			if (yc>=glcd_height-skip) {
+				glcd_scrollvertical(skip);
+				glcd_plotrectfill(0, glcd_height-skip, glcd_width, skip, GLCD_COLOR_BLACK);
+			} else {
+				yc=yc+skip;
+			}
+		}
+		glcd_plotchar(xc, yc, (uint8_t) c, GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK);
+		xc += 5;
+		/* Plot a <color> line of 8 pixels, the height of a character */
+		glcd_plotverticalline(xc, yc, 8, GLCD_COLOR_BLACK);
+		xc++;
+	}
+}
+
+ /* Function glcd_printconsole
+  * Software based console printing (slow!)
+  * @public
+  * @in: str  -- string to be printed
+  * @out: void
+  */
+void glcd_printconsole(char str[]) {
+	register uint32_t i;
+
+	for (i=0; str[i] != '\0'; i++) {
+		glcd_putchar(str[i]);
+	}
+}
+
+
+//void glcd_scroll_row() {
+//
+//	static uint16_t place = 0;
+//
+//	place++;
+//
+//	// VSCRDEF
+//	glcd_data[0] = 0x00;
+//	glcd_data[1] = 0x00;
+//	glcd_data[2] = 0x01;
+//	glcd_data[3] = 0x40;
+//	glcd_data[4] = 0x00;
+//	glcd_data[5] = 0x00;
+//	glcd_write(0x33, 6, glcd_data);
+//
+//	glcd_data[0] = 0x00;
+//	glcd_data[1] = 0x00;
+//	glcd_data[2] = 0x01;
+//	glcd_data[3] = 0x3f;
+//	glcd_write(0x2a, 2, glcd_data);
+//
+//	glcd_data[0] = 0x00;
+//	glcd_data[1] = 0x00;
+//	glcd_data[2] = 0x00;
+//	glcd_data[3] = 0xef;
+//	glcd_write(0x2b, 2, glcd_data);
+//
+//	glcd_data[0] = place>>8;
+//	glcd_data[1] = place&0xff;
+//	glcd_write(0x37, 2, glcd_data);
+//
 //}
+//
