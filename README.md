@@ -1,5 +1,7 @@
 # STM32 Repository
 
+## NOTE: work is ongoing and changes are immenent without prior notification
+
 This repository houses some C and C++ code examples for the STM32F4xx Nucleo Boards series. 
 
 * STM32F446_blinky -- Simple LED blink project
