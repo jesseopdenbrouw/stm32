@@ -7,8 +7,8 @@
 
 Software License Agreement (BSD License)
 
-Version: 0.1
-Date: 2020/07/15
+Version: 0.2
+Date: 2020/07/17
 
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
@@ -47,7 +47,7 @@ extern "C"
 #endif
 
 /* Driver version */
-#define GLCD_VERSION "STM32 VMA412 GLCD Driver Version 0.1 (Jul 15 2020)"
+#define GLCD_VERSION "STM32 VMA412 GLCD Driver Version 0.2 (Jul 17 2020)"
 
 
 /* Should we use flood fill? */
@@ -58,6 +58,12 @@ extern "C"
 #define GLCD_USE_FLOOD_FILL_PRINT_IF_STACK_OVERFLOW
 /* Do we include the arc function, needs sinf and cosf functions */
 #define GLCD_USE_ARC
+/* Character table in ROM or RAM */
+/* Note: although you can set the character table to RAM, it
+ * still occupies ROM. The character table is then copied
+ * from ROM to RAM
+ */
+#define GLCD_CHARCTERS_IN_RAM
 
 /* Width and the height in pixels, landscape */
 #define GLCD_WIDTH (320)
@@ -141,8 +147,11 @@ void glcd_read_terminate(uint16_t cmd, uint16_t amount, glcd_buffer_t data[]);
 void glcd_write(uint16_t cmd, uint16_t amount, const glcd_buffer_t data[]);
 /* Terminate a write */
 void gcld_terminate_write(void);
+/* Sets the delay (width) of the read pulse, USE WITH CARE */
+void glcd_set_read_pulse_delay(uint32_t delay);
 /* Sets the delay (width) of the write pulse, USE WITH CARE */
 void glcd_set_write_pulse_delay(uint32_t delay);
+/* set the delay (read) of the read pulse, USE WITH CARE */
 
 
 /* High level commands */
@@ -176,6 +185,7 @@ void glcd_plotcircle(uint16_t x0, uint16_t y0, uint16_t r, glcd_color_t color);
 #ifdef GLCD_USE_ARC
 void glcd_plotarc(uint16_t xc, uint16_t yc, uint16_t r, float start, float stop, glcd_color_t color);
 #endif
+void glcd_plottriangle(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t x3, uint16_t y3, glcd_color_t color);
 
 /* Plot a two-color bitmap on the screen */
 void glcd_plotbitmap(uint16_t x, uint16_t y, const uint8_t bitmap[], uint16_t w, uint16_t h, glcd_color_t color, glcd_color_t bg);
@@ -198,13 +208,10 @@ void glcd_floodfill(uint16_t xs,uint16_t ys, glcd_color_t fillColor, glcd_color_
 /* Scroll the screen up vertical (software) */
 void glcd_scrollvertical(uint16_t lines);
 
-/* Hardware scroll not implemented */
-//void glcd_scroll_row();
-
 /* Printing character on console based output */
 void glcd_putchar(char c);
 /* Printing a string on console bases output */
-void glcd_printconsole(char str[]);
+void glcd_puts(char str[]);
 
 /* Get the current width of the screen */
 uint16_t glcd_getwidth(void);
@@ -212,6 +219,8 @@ uint16_t glcd_getwidth(void);
 /* Get the current height of the screen */
 uint16_t glcd_getheight(void);
 
+/* Convert 16 bit colors to glcd_color_t */
+glcd_color_t glcd_convertcolor(uint16_t color16);
 
 #ifdef __cplusplus
 }

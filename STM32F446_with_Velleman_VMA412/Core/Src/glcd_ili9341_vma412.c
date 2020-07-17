@@ -7,8 +7,8 @@
 
 Software License Agreement (BSD License)
 
-Version: 0.1
-Date: 2020/07/15
+Version: 0.2
+Date: 2020/07/17
 
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
@@ -110,8 +110,12 @@ static glcd_buffer_t glcd_data[3*GLCD_WIDTH+1];
 static uint16_t glcd_width = GLCD_WIDTH;
 static uint16_t glcd_height = GLCD_HEIGHT;
 
-/* Standard 5x7 font from AdaFruit */
-static const uint8_t glcd_font[] = {
+/* Standard 5x7 (6x8) font from AdaFruit */
+#ifdef GLCD_CHARCTERS_IN_RAM
+#else
+const
+#endif
+static uint8_t glcd_font[] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x3E, 0x5B, 0x4F, 0x5B, 0x3E, 0x3E, 0x6B,
     0x4F, 0x6B, 0x3E, 0x1C, 0x3E, 0x7C, 0x3E, 0x1C, 0x18, 0x3C, 0x7E, 0x3C,
     0x18, 0x1C, 0x57, 0x7D, 0x57, 0x1C, 0x1C, 0x5E, 0x7F, 0x5E, 0x1C, 0x00,
@@ -430,6 +434,7 @@ static const uint8_t glcd_hhs_small_map[] = {
 static uint32_t prems;
 static uint32_t preus;
 static uint32_t ns100;
+static uint32_t readdelay;
 
 
 /*
@@ -446,7 +451,8 @@ static void glcd_delay_init(void) {
 	SystemCoreClockUpdate();
 	prems = SystemCoreClock/3000UL+1UL;     /* factor for ms delay */
 	preus = SystemCoreClock/3000000UL+1UL;  /* factor for us delay */
-	ns100 = SystemCoreClock/30000000UL+1UL; /* factor for 100 ns delay */
+	ns100 = SystemCoreClock/30000000UL+1UL; /* factor for 66 ns write delay */
+	readdelay = ns100*7;                    /* factor for 450 ns read write */
 }
 
 /* Function glcd_delay_ms
@@ -498,11 +504,32 @@ static void glcd_delay_us(uint32_t delay) {
  * @in: none
  * @out: void
  */
-static void glcd_delay_halfus(void) {
+static void glcd_delay_write(void) {
 
 	uint32_t ns = ns100;
 
 	asm volatile ("mov r3, %[ns] \n\t"
+				  ".Lglcdhu%=: \n\t"
+				  "subs r3, #1 \n\t"
+				  "bne .Lglcdhu%= \n\t"
+                  :
+                  : [ns] "r" (ns)
+                  : "r3", "cc"
+				 );
+}
+
+/* Function glcd_delay_read
+ * Creates a delay for the GLCD read functions
+ * Tweakable
+ * @private
+ * @in: none
+ * @out: void
+ */
+static void glcd_delay_read(void) {
+
+		uint32_t ns = readdelay;
+
+	    asm volatile ("mov r3, %[ns] \n\t"
 				  ".Lglcdhu%=: \n\t"
 				  "subs r3, #1 \n\t"
 				  "bne .Lglcdhu%= \n\t"
@@ -520,6 +547,16 @@ static void glcd_delay_halfus(void) {
  */
 void glcd_set_write_pulse_delay(uint32_t delay) {
 	ns100 = delay;
+}
+
+/* Function glcd_set_read_pulse_delay
+ * Sets the delay (width) of the read pulse
+ * @public
+ * @in: delay --> delay in 3 clock pulses
+ * @out: void
+ */
+void glcd_set_read_pulse_delay(uint32_t delay) {
+	readdelay = delay;
 }
 
 /*
@@ -627,7 +664,7 @@ void glcd_write_command(uint16_t cmd, glcd_cs_t what, glcd_dir_t dir) {
 	/* Write enable */
 	(GLCD_WR.pGPIO)->BSRR = (1<<(GLCD_WR.pin+16));
 	/* Wait */
-	glcd_delay_halfus();
+	glcd_delay_write();
 	/* Write disable */
 	(GLCD_WR.pGPIO)->BSRR = (1<<(GLCD_WR.pin));
 
@@ -673,18 +710,13 @@ void glcd_read_terminate(uint16_t cmd, uint16_t amount, glcd_buffer_t data[]) {
 		/* Read enable */
 		(GLCD_RD.pGPIO)->BSRR = GLCD_RD.pin_shift16;
 
-#ifdef __OPTIMIZE__
 		/* Wait a bit for data bits to be stabilized after READ is asserted */
 		/* Seems to be needed with flood fill */
-		glcd_delay_halfus();
-#endif
+		glcd_delay_read();
 
 		effe=0;
 		pGLCDD = GLCD_D;
-//		for (i=0; i<8; i++) {
-//			temp = (GLCD_D[i]).pGPIO->IDR & (GLCD_D[i].pin_shift);
-//			effe = effe | (temp ? (1<<i) : 0);
-//		}
+
 		temp = pGLCDD->pGPIO->IDR & pGLCDD->pin_shift; effe |= temp ?   1 : 0; pGLCDD++;
 		temp = pGLCDD->pGPIO->IDR & pGLCDD->pin_shift; effe |= temp ?   2 : 0; pGLCDD++;
 		temp = pGLCDD->pGPIO->IDR & pGLCDD->pin_shift; effe |= temp ?   4 : 0; pGLCDD++;
@@ -790,7 +822,7 @@ void glcd_write(uint16_t cmd, uint16_t amount, const glcd_buffer_t data[]) {
 
 		/* Write enable */
 		*pwrBSRR = wrpin_en;
-		glcd_delay_halfus();
+		glcd_delay_write();
 		/* Write disable*/
 		*pwrBSRR = wrpin_dis;
 	}
@@ -882,8 +914,8 @@ void glcd_init(void) {
 	switch (rot) {
 	case GLCD_SCREEN_ROT0: glcd_data[0] = 0xe8; glcd_width = GLCD_WIDTH; glcd_height = GLCD_HEIGHT; break;
 	case GLCD_SCREEN_ROT90: glcd_data[0] = 0x88; glcd_width = GLCD_HEIGHT; glcd_height = GLCD_WIDTH; break;
-	case GLCD_SCREEN_ROT180: glcd_data[0] = 0xbc; glcd_width = GLCD_WIDTH; glcd_height = GLCD_HEIGHT; break;
-	case GLCD_SCREEN_ROT270: glcd_data[0] = 0xc8; glcd_width = GLCD_HEIGHT; glcd_height = GLCD_WIDTH; break;
+	case GLCD_SCREEN_ROT180: glcd_data[0] = 0x28; glcd_width = GLCD_WIDTH; glcd_height = GLCD_HEIGHT; break;
+	case GLCD_SCREEN_ROT270: glcd_data[0] = 0x48; glcd_width = GLCD_HEIGHT; glcd_height = GLCD_WIDTH; break;
 	default: glcd_data[0] = 0xe8; break;
 	}
 	glcd_write(0x36, 1, glcd_data);
@@ -907,12 +939,14 @@ void glcd_cls(glcd_color_t color) {
 	glcd_data[1] = 0x00;
 	glcd_data[2] = ((glcd_width-1)>>8)&0xff; //0x01;
 	glcd_data[3] = (glcd_width-1)&0xff; //0x3f;
-	glcd_write(glcd_width>glcd_height ? 0x2a : 0x2b, 4, glcd_data);
+	//glcd_write(glcd_width>glcd_height ? 0x2a : 0x2b, 4, glcd_data);
+	glcd_write(0x2a, 4, glcd_data);
 
 	//0x2B, reset y position to full height
 	glcd_data[2] = ((glcd_height-1)>>8)&0xff; //0x00;
 	glcd_data[3] = (glcd_height-1)&0xff; //0xef;
-	glcd_write(glcd_width<=glcd_height ? 0x2a : 0x2b, 4, glcd_data);
+	//glcd_write(glcd_width<=glcd_height ? 0x2a : 0x2b, 4, glcd_data);
+	glcd_write(0x2b, 4, glcd_data);
 
 
 	/* Populate array */
@@ -1482,7 +1516,7 @@ void glcd_floodfill(uint16_t xs,uint16_t ys, glcd_color_t fillColor, glcd_color_
  * @in: color -- the RGB color specification
  * @out: void
  */
-/* glcd_plotarc can be omitted, which saves code for computing sin en cos */
+/* glcd_plotarc can be omitted, which saves code for computing sinf and cosf */
 #ifdef GLCD_USE_ARC
 void glcd_plotarc(uint16_t xc, uint16_t yc, uint16_t r, float start, float stop, glcd_color_t color) {
 	/* Really should be arctan(1/r), but is almost equal for r >> 1 */
@@ -1502,6 +1536,25 @@ void glcd_plotarc(uint16_t xc, uint16_t yc, uint16_t r, float start, float stop,
 	}
 }
 #endif
+
+/* Function glcd_triangle
+ * Plots a triangle on the GLCD
+ * @public
+ * @in: x1  -- x point 1
+ * @in: y1  -- y point 1
+ * @in: x2  -- x point 2
+ * @in: y2  -- y point 2
+ * @in: x3  -- x point 3
+ * @in: y3  -- y point 3
+ * @in: color -- the RGB color specification
+ * @out: void
+ */
+void glcd_plottriangle(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t x3, uint16_t y3, glcd_color_t color) {
+	glcd_plotline(x1, y1, x2, y2, color);
+	glcd_plotline(y2, y2, x3, y3, color);
+	glcd_plotline(x3, y3, x1, y1, color);
+}
+
 
 /* Function glcd_scroll_vertical
  * Software based vertical scroll (slow!)
@@ -1583,6 +1636,9 @@ void glcd_putchar(char c) {
 			/* Just set to new line */
 			yc=yc+skip;
 		}
+	} else if (c=='\t') {
+		/* Handle tabs for 4 spaces */
+
 	} else {
 		/* Wrap is needed */
 		if (xc>=glcd_width-(glcd_width%6)) {
@@ -1602,13 +1658,13 @@ void glcd_putchar(char c) {
 	}
 }
 
- /* Function glcd_printconsole
+ /* Function glcd_puts
   * Software based console printing (slow!)
   * @public
   * @in: str  -- string to be printed
   * @out: void
   */
-void glcd_printconsole(char str[]) {
+void glcd_puts(char str[]) {
 	register uint32_t i;
 
 	for (i=0; str[i] != '\0'; i++) {
@@ -1617,6 +1673,7 @@ void glcd_printconsole(char str[]) {
 }
 
 /* TODO: To be implemented, hardware scroll */
+/* The ILI9431 has a hardware ROTATE, but it messes up X and Y coordinates */
 //void glcd_scroll_row() {
 //
 //	static uint16_t place = 0;
@@ -1657,7 +1714,7 @@ void glcd_printconsole(char str[]) {
  * @in: void
  * @out: width
  */
-uint16_t glcd_getwidth(void) {
+inline uint16_t glcd_getwidth(void) {
 	return glcd_width;
 }
 
@@ -1667,6 +1724,18 @@ uint16_t glcd_getwidth(void) {
  * @in: void
  * @out: height
  */
-uint16_t glcd_getheight(void) {
+inline uint16_t glcd_getheight(void) {
 	return glcd_height;
+}
+
+/* Function glcd_convertcolor
+ * Converts a 16 bit color to 24 bit color (18 bits used)
+ * @public
+ * @in: color16 --> the 16 bit color specification
+ * @out: the 24-bit color
+ */
+glcd_color_t glcd_convertcolor(uint16_t color16) {
+	return ((color16 & 0xf800)<<13) |
+		   ((color16 & 0x07e0)<<11) |
+		   ((color16 & 0x001f));
 }

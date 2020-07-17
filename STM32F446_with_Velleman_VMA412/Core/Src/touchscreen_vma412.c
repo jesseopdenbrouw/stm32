@@ -7,8 +7,8 @@
 
 Software License Agreement (BSD License)
 
-Version: 0.1
-Date: 2020/07/15
+Version: 0.2
+Date: 2020/07/17
 
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
@@ -43,6 +43,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <limits.h>
 
 #include <touchscreen_vma412.h>
 
@@ -377,7 +378,7 @@ uint32_t touchscreen_pressure(void) {
 }
 
 /* Function touchscreen_map
- * Maps raw x/y coordinates to screen x/y coordinates
+ * Maps raw touchscreen value to a screen value
  * @public
  * @in: value --> the raw value
  * @in: tlow  --> touchscreen raw lowest value
@@ -389,17 +390,17 @@ uint32_t touchscreen_pressure(void) {
 int32_t touchscreen_map(uint32_t value, uint32_t tlow, uint32_t thigh, uint32_t slow, uint32_t shigh) {
 
 	/* We use floats here because the STM32F has hardware support for floats */
-	float rico, start;
+	float slope, start;
 
-	/* Make sure that thigh > low */
-	if (thigh>tlow) {
-		rico  = (float)(shigh-slow)/(float)(thigh-tlow);
-		start = - rico*(float)tlow;
-		return rico*value + start;
+	/* Make sure that thigh != low */
+	if (thigh!=tlow) {
+		slope  = ((float)shigh-(float)slow)/((float)thigh-(float)tlow);
+		start = - slope*(float)tlow;
+		return slope*value + start;
 	}
 
 	/* If thigh == tlow, we divide by 0 and that is not possible */
-	return 0;
+	return INT_MIN;
 }
 
 /* Function touchscreen_pressed
@@ -408,6 +409,6 @@ int32_t touchscreen_map(uint32_t value, uint32_t tlow, uint32_t thigh, uint32_t 
  * @in: p --> the raw pressure value
  * @out: 0 is not pressed, !0 if pressed
  */
-uint32_t touchscreen_pressed(uint32_t p) {
+uint32_t touchscreen_ispressed(uint32_t p) {
 	return (p>=TOUCH_PRESSURE_LOW && p<=TOUCH_PRESSURE_HIGH);
 }

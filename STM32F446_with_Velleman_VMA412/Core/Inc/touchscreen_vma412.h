@@ -7,8 +7,8 @@
 
 Software License Agreement (BSD License)
 
-Version: 0.1
-Date: 2020/07/15
+Version: 0.2
+Date: 2020/07/17
 
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
@@ -38,13 +38,18 @@ POSSIBILITY OF SUCH DAMAGE.
 
  */
 
-#ifndef INC_STM32F446_TOUCHSCREEN_H_
-#define INC_STM32F446_TOUCHSCREEN_H_
+#ifndef INC_TOUCHSCREEN_H_
+#define INC_TOUCHSCREEN_H_
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif
 
 #include "main.h"
 
 /* Driver version */
-#define TOUCH_VERSION "STM32 VMA412 TS Driver Version 0.1 (Jul 15 2020)"
+#define TOUCH_VERSION "STM32 VMA412 TS Driver Version 0.2 (Jul 17 2020)"
 
 /* Calibrate the touchscreen */
 #define TOUCH_LEFT 120
@@ -80,6 +85,10 @@ uint32_t touchscreen_pressure(void);
 int32_t touchscreen_map(uint32_t value, uint32_t tlow, uint32_t thigh, uint32_t slow, uint32_t shigh);
 
 /* 1 if pressed, 0 if not pressed */
-uint32_t touchscreen_pressed(uint32_t p);
+uint32_t touchscreen_ispressed(uint32_t p);
 
-#endif /* INC_STM32F446_TOUCHSCREEN_H_ */
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* INC_TOUCHSCREEN_H_ */

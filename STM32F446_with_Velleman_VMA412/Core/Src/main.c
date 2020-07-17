@@ -84,7 +84,7 @@ POSSIBILITY OF SUCH DAMAGE.
 								  "Plot pixel (100000x):   ", \
 								  "Plot circle (100x):     ", \
 								  "Plot rectangle (1000x): ", \
-								  "Plot filled rect (10x): ", \
+								  "Plot filled rect (100x):", \
 								  "Flood fill circle:      ", \
 								  "Flood fill triangle:    ", \
 								  "Flood fill arc:         ", \
@@ -103,11 +103,11 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #define PRINT_CLOCK() {\
 		char string[20]; \
-		glcd_printconsole("\fTiming of the GLCD functions:\n\n"); \
+		glcd_puts("\fTiming of the GLCD functions:\n\n"); \
 		for (int i=0; i<20; i++) { \
-			glcd_printconsole(clocknames[i]); \
+			glcd_puts(clocknames[i]); \
 			sprintf(string, "%6lu.%03lu ms\n", clockval[i]/1000UL, clockval[i]%1000UL); \
-			glcd_printconsole(string); \
+			glcd_puts(string); \
 		} \
 		}
 #else
@@ -118,8 +118,9 @@ POSSIBILITY OF SUCH DAMAGE.
 #endif
 
 void demo_touchscreen(void);
-
 void demo_glcd(void);
+void demo_rotation(void);
+void demo_characterset(void);
 
 int main(void) {
 
@@ -160,7 +161,7 @@ int main(void) {
     /* For printing clock speed */
 	char buffer[40];
 
-	uint16_t x, y;
+	uint16_t x, y, raw;
 
 	/* Update the system clock frequency variable
 	 * Can be omitted since glcd_init() also performs
@@ -174,13 +175,14 @@ int main(void) {
 
 	/* Tweak the length of the read/write pulse, USE WITH CARE */
 	/* Argument must be > 0. Smaller values means faster reads/writes */
-	//glcd_set_write_pulse_delay(3);
+//	glcd_set_write_pulse_delay(3);
+//	glcd_set_read_pulse_delay(10);
 
 	/* At this point, the GLCD is ready */
 
 	/* Initialize the touchscreen system */
 	/* Select one of ADC1 and ADC2 */
-	touchscreen_init(ADC1);
+	touchscreen_init(ADC2);
 
 	/* At this point, the touchscreen is ready */
 
@@ -190,36 +192,49 @@ int main(void) {
 		glcd_cls(GLCD_COLOR_BLACK);
 
 		/* Print driver info */
-		glcd_plotstring(10, 48, GLCD_VERSION, GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
-		glcd_plotstring(10, 58, TOUCH_VERSION, GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+		glcd_plotstring(10, 28, GLCD_VERSION, GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+		glcd_plotstring(10, 38, TOUCH_VERSION, GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
 
 		snprintf(buffer, sizeof buffer, "Clock speed: %lu", SystemCoreClock);
-		glcd_plotstring(10, 80, buffer, GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+		glcd_plotstring(10, 60, buffer, GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
 
-		glcd_plotrectfill(20, 120, 20, 20, GLCD_COLOR_YELLOW);
-		glcd_plotstring(50, 126, "Touch rectangle to start GLCD demo", GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+		glcd_plotrectfill(20, 100, 20, 20, GLCD_COLOR_YELLOW);
+		glcd_plotstring(50, 106, "Touch rectangle to start GLCD demo", GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
 
-		glcd_plotrectfill(20, 150, 20, 20, GLCD_COLOR_YELLOW);
-		glcd_plotstring(50, 156, "Touch rectangle to start touchscreen demo", GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+		glcd_plotrectfill(20, 130, 20, 20, GLCD_COLOR_YELLOW);
+		glcd_plotstring(50, 136, "Touch rectangle to start touchscreen demo", GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
 
+		glcd_plotrectfill(20, 160, 20, 20, GLCD_COLOR_YELLOW);
+		glcd_plotstring(50, 166, "Touch rectangle to start rotation demo", GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+
+		glcd_plotrectfill(20, 190, 20, 20, GLCD_COLOR_YELLOW);
+		glcd_plotstring(50, 196, "Touch rectangle to show character set", GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
 		/* Get a coordinate from the touchscreen */
 		while (1) {
 
 			/* Wait for the screen to be touched */
-			while (!touchscreen_pressed(touchscreen_pressure())) {}
+			while (!touchscreen_ispressed(touchscreen_pressure())) {}
 
-			x = touchscreen_readx();
-			x = touchscreen_map(x, TOUCH_LEFT, TOUCH_RIGHT, 0, glcd_getwidth());
+			raw = touchscreen_readx();
+			x = touchscreen_map(raw, TOUCH_LEFT, TOUCH_RIGHT, 0, glcd_getwidth());
 
-			y = touchscreen_ready();
-			y = touchscreen_map(y, TOUCH_BOTTOM, TOUCH_TOP, 0, glcd_getheight());
+			raw = touchscreen_ready();
+			y = touchscreen_map(raw, TOUCH_BOTTOM, TOUCH_TOP, 0, glcd_getheight());
 
-			if (x>=20 && x<=20+20 & y>=120 && y<=120+20) {
+			if (x>=20 && x<=20+20 && y>=100 && y<=100+20) {
 				demo_glcd();
 				break;
 			}
-			if (x>=20 && x<=20+20 & y>=150 && y<=150+20) {
+			if (x>=20 && x<=20+20 && y>=130 && y<=130+20) {
 				demo_touchscreen();
+				break;
+			}
+			if (x>=20 && x<=20+20 && y>=160 && y<=160+20) {
+				demo_rotation();
+				break;
+			}
+			if (x>=20 && x<=20+20 && y>=190 && y<=190+20) {
+				demo_characterset();
 				break;
 			}
 		}
@@ -228,6 +243,7 @@ int main(void) {
 	return 0;
 }
 
+/* Touch screen drawing demo */
 void demo_touchscreen(void) {
 
 	glcd_color_t color = 0;
@@ -235,9 +251,17 @@ void demo_touchscreen(void) {
 	uint32_t xraw, yraw, p;
 	int32_t x, y;
 
-	glcd_printconsole("\fTouch rectangle on the right to exit");
+	glcd_puts("\fTouch rectangle on the right to exit");
 	glcd_plotrectfill(glcd_getwidth()-20, 0, 20, 20, GLCD_COLOR_WHITE);
 
+	/* Wait until the touchscreen is untouched */
+	while (!touchscreen_ispressed(touchscreen_pressure())) {}
+	while (touchscreen_ispressed(touchscreen_pressure())) {}
+
+	/* Remove text */
+	glcd_plotrectfill(0, 0, glcd_getwidth()-20, 20, GLCD_COLOR_BLACK);
+
+	/* Now read in x and y and pressure */
 	while (1) {
 		/* Read raw X coordinate and map it to screen coordinate */
 		xraw = touchscreen_readx();
@@ -252,7 +276,7 @@ void demo_touchscreen(void) {
 
 		color++;
 
-		if (touchscreen_pressed(p)) {
+		if (touchscreen_ispressed(p)) {
 			/* Touched in the upper right corner? Then clear screen */
 			if (x>glcd_getwidth()-20 && y<20) {
 				break;
@@ -261,12 +285,14 @@ void demo_touchscreen(void) {
 			}
 		}
 	}
-
 }
 
+/* GLCD demo, no touch needed */
 void demo_glcd(void) {
 
 	uint32_t i, j;
+	glcd_color_t color = 0x0000e0;
+
 	/* For speed measurements */
 	SETUP_CLOCK();
 
@@ -289,7 +315,7 @@ void demo_glcd(void) {
 	glcd_cls(GLCD_COLOR_BLACK);
 	GET_CLOCK(1);
 
-	glcd_printconsole("\fPlotting 100000 pixels...");
+	glcd_puts("\fPlotting 100000 pixels...\n");
 
 	START_CLOCK();
 	for (i = 0; i < 100000; i++) {
@@ -297,7 +323,7 @@ void demo_glcd(void) {
 	}
 	GET_CLOCK(2);
 
-	glcd_printconsole("\fPlotting 100 circles...\n");
+	glcd_puts("Plotting 100 circles...\n");
 
 	START_CLOCK();
 	for (i = 0; i < 100; i++) {
@@ -305,7 +331,7 @@ void demo_glcd(void) {
 	}
 	GET_CLOCK(3);
 
-	glcd_printconsole("Plotting 1000 rectangles...\n");
+	glcd_puts("Plotting 1000 rectangles...\n");
 
 	START_CLOCK();
 	for (i = 0; i < 1000; i++) {
@@ -313,15 +339,16 @@ void demo_glcd(void) {
 	}
 	GET_CLOCK(4);
 
-	glcd_printconsole("Plotting 10 filled rectangles...\n");
+	glcd_puts("Plotting 100 filled rectangles...\n");
 
 	START_CLOCK();
-	for (i = 0; i < 10; i++) {
-		glcd_plotrectfill(20,100, 200, 100, GLCD_COLOR_RED);
+	for (i = 0; i < 100; i++) {
+		glcd_plotrectfill(20,100, 200, 100, color);
+		color += 0x030104;
 	}
 	GET_CLOCK(5);
 
-	glcd_printconsole("\fFilling objects...\n");
+	glcd_puts("\fFilling objects...\n");
 
     START_CLOCK();
 	glcd_plotcircle(100, 100, 30, GLCD_COLOR_WHITE);
@@ -331,12 +358,10 @@ void demo_glcd(void) {
 #endif
 
 	/* Plot a triangle and fill it */
-	glcd_plotline(200, 200, 150, 150, GLCD_COLOR_WHITE);
-	glcd_plotline(200, 200, 240, 130, GLCD_COLOR_WHITE);
-	glcd_plotline(240, 130, 150, 150, GLCD_COLOR_WHITE);
+	glcd_plottriangle(200, 200, 150, 150, 240, 120, GLCD_COLOR_WHITE);
 #ifdef GLCD_USE_FLOOD_FILL
 	START_CLOCK();
-	glcd_floodfill(210, 180, GLCD_COLOR_RED, GLCD_COLOR_BLACK);
+	glcd_floodfill(200, 180, GLCD_COLOR_RED, GLCD_COLOR_BLACK);
 	GET_CLOCK(7);
 #endif
 
@@ -360,7 +385,7 @@ void demo_glcd(void) {
 		GET_CLOCK(9);
 	}
 
-	glcd_printconsole("\fMiscellaneous");
+	glcd_puts("\fMiscellaneous");
 
 	/* Plot the sine and cosine */
 	const float angle = 2*M_PI/320.0f;
@@ -418,31 +443,32 @@ void demo_glcd(void) {
 	glcd_delay_ms(1000);
 
 	/* Console based printing */
-	glcd_printconsole("\fConsole based printing");
+	glcd_puts("\fConsole based printing");
     for (i=0; i<10; i++) {
-    	glcd_printconsole("Hello\n");
+    	glcd_puts("Hello\n");
     }
 	START_CLOCK();
 	for (i=0; i<10; i++) {
-		glcd_printconsole("12345678901234567890123456789012345678901234567890ABC\r");
+		glcd_puts("12345678901234567890123456789012345678901234567890ABC\r");
 	}
     GET_CLOCK(11);
     for (int i=0; i<10; i++) {
-    	glcd_printconsole("Hello\n");
+    	glcd_puts("Hello\n");
     }
-	glcd_printconsole("123456789012345678901234567890123456789012345678901234567890\n");
+	glcd_puts("123456789012345678901234567890123456789012345678901234567890\n");
 
 	START_CLOCK();
-    glcd_printconsole("\nConsole based print routines\n\nAnd another line\nAnd another one\b\b\bline\n\b\b\bhello\n");
+    glcd_puts("\nConsole based print routines\n\nAnd another line\nAnd another one\b\b\bline\n\b\b\bhello\n");
     GET_CLOCK(12);
 
 	glcd_delay_ms(3000);
 
+	glcd_puts("\f");
 	/* Plot all the grey scales */
 	for (i=0; i<256; i++) {
 		glcd_plotverticalline(i, 0, 240, (i<<16)+(i<<8)+i);
 	}
-	glcd_printconsole("Plotting grey scales");
+	glcd_puts("Plotting grey scales");
 
 	glcd_delay_ms(2000);
 
@@ -458,10 +484,169 @@ void demo_glcd(void) {
 	glcd_putchar('\n');
     for (i=9; i>0; i--) {
     	glcd_putchar(i+0x30);
-    	glcd_printconsole(" seconds left\r");
+    	glcd_puts(" seconds left\r");
     	glcd_delay_ms(1000);
     }
 #else
 	glcd_delay_ms(10000);
 #endif
+}
+
+/* Rotation demo and the use of touchscreen */
+void demo_rotation(void) {
+
+	uint16_t p, raw;
+	int16_t x, y;
+
+	/* Rotation 90 degrees */
+	glcd_cls(GLCD_COLOR_BLACK);
+
+	glcd_setrotation(GLCD_SCREEN_ROT90);
+
+	glcd_plotrectfill(20, 120, 20, 20, GLCD_COLOR_YELLOW);
+	glcd_plotstring(50, 126, "Touch rectangle", GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+
+	glcd_plotrectfill(20, 150, 20, 20, GLCD_COLOR_YELLOW);
+	glcd_plotstring(50, 156, "Touch rectangle", GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+
+	glcd_plotrectfill(20, 180, 20, 20, GLCD_COLOR_YELLOW);
+	glcd_plotstring(50, 186, "Touch for next", GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+
+	/* Get a coordinate from the touchscreen */
+	while (1) {
+
+		raw = touchscreen_readx();
+		y = touchscreen_map(raw, TOUCH_LEFT, TOUCH_RIGHT, 0, glcd_getheight());
+
+		raw = touchscreen_ready();
+		x = glcd_getwidth() - touchscreen_map(raw, TOUCH_BOTTOM, TOUCH_TOP, 0, glcd_getwidth());
+
+		p = touchscreen_pressure();
+
+		if (touchscreen_ispressed(p)) {
+			if (x>=20 && x<=20+20 && y>=120 && y<=120+20) {
+				glcd_plotstring(20, 20, "Touched!", GLCD_COLOR_RED, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+			}
+			if (x>=20 && x<=20+20 && y>=150 && y<=150+20) {
+				glcd_plotstring(20, 20, "Touched!", GLCD_COLOR_BLUE, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+			}
+			if (x>=20 && x<=20+20 && y>=180 && y<=180+20) {
+				glcd_setrotation(GLCD_SCREEN_ROT0);
+				break;
+			}
+		} else {
+			glcd_plotstring(20, 20, "Touched!", GLCD_COLOR_BLACK, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+		}
+	}
+
+	/* Rotation 180 degrees */
+	glcd_cls(GLCD_COLOR_BLACK);
+
+	glcd_setrotation(GLCD_SCREEN_ROT180);
+
+	glcd_plotrectfill(20, 120, 20, 20, GLCD_COLOR_YELLOW);
+	glcd_plotstring(50, 126, "Touch rectangle", GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+
+	glcd_plotrectfill(20, 150, 20, 20, GLCD_COLOR_YELLOW);
+	glcd_plotstring(50, 156, "Touch rectangle", GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+
+	glcd_plotrectfill(20, 180, 20, 20, GLCD_COLOR_YELLOW);
+	glcd_plotstring(50, 186, "Touch for next", GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+
+	/* Get a coordinate from the touchscreen */
+	while (1) {
+
+		raw = touchscreen_readx();
+		x = glcd_getwidth() - touchscreen_map(raw, TOUCH_LEFT, TOUCH_RIGHT, 0, glcd_getwidth());
+
+		raw = touchscreen_ready();
+		y = glcd_getheight() - touchscreen_map(raw, TOUCH_BOTTOM, TOUCH_TOP, 0, glcd_getheight());
+
+		p = touchscreen_pressure();
+
+		if (touchscreen_ispressed(p)) {
+			if (x>=20 && x<=20+20 && y>=120 && y<=120+20) {
+				glcd_plotstring(20, 20, "Touched!", GLCD_COLOR_RED, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+			}
+			if (x>=20 && x<=20+20 && y>=150 && y<=150+20) {
+				glcd_plotstring(20, 20, "Touched!", GLCD_COLOR_BLUE, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+			}
+			if (x>=20 && x<=20+20 && y>=180 && y<=180+20) {
+				glcd_setrotation(GLCD_SCREEN_ROT0);
+				break;
+			}
+		} else {
+			glcd_plotstring(20, 20, "Touched!", GLCD_COLOR_BLACK, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+		}
+	}
+
+	/* Rotation 270 degrees */
+	glcd_cls(GLCD_COLOR_BLACK);
+
+	glcd_setrotation(GLCD_SCREEN_ROT270);
+
+	glcd_plotrectfill(20, 120, 20, 20, GLCD_COLOR_YELLOW);
+	glcd_plotstring(50, 126, "Touch rectangle", GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+
+	glcd_plotrectfill(20, 150, 20, 20, GLCD_COLOR_YELLOW);
+	glcd_plotstring(50, 156, "Touch rectangle", GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+
+	glcd_plotrectfill(20, 180, 20, 20, GLCD_COLOR_YELLOW);
+	glcd_plotstring(50, 186, "Touch for exit", GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+
+	/* Get a coordinate from the touchscreen */
+	while (1) {
+
+		raw = touchscreen_readx();
+		y = glcd_getheight() - touchscreen_map(raw, TOUCH_LEFT, TOUCH_RIGHT, 0, glcd_getheight());
+
+		raw = touchscreen_ready();
+		x = touchscreen_map(raw, TOUCH_BOTTOM, TOUCH_TOP, 0, glcd_getwidth());
+
+		p = touchscreen_pressure();
+
+		if (touchscreen_ispressed(p)) {
+			if (x>=20 && x<=20+20 && y>=120 && y<=120+20) {
+				glcd_plotstring(20, 20, "Touched!", GLCD_COLOR_RED, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+			}
+			if (x>=20 && x<=20+20 && y>=150 && y<=150+20) {
+				glcd_plotstring(20, 20, "Touched!", GLCD_COLOR_BLUE, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+			}
+			if (x>=20 && x<=20+20 && y>=180 && y<=180+20) {
+				glcd_setrotation(GLCD_SCREEN_ROT0);
+				break;
+			}
+		} else {
+			glcd_plotstring(20, 20, "Touched!", GLCD_COLOR_BLACK, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+		}
+	}
+}
+
+/* plot the character set and wait for touch */
+void demo_characterset(void) {
+
+	uint32_t i, j;
+	char buffer[40];
+
+	glcd_cls(GLCD_COLOR_BLACK);
+
+	/* Plot the complete character table */
+	for (j=0; j<16; j++) {
+		snprintf(buffer, sizeof buffer, "%1lx", j);
+		glcd_plotstring(40+j*10, 20, buffer, GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+	}
+
+	for (i=0; i<16; i++) {
+		snprintf(buffer, sizeof buffer, "%1lx", i);
+		glcd_plotstring(0, 40+i*10, buffer, GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+		for (j=0; j<16; j++) {
+			glcd_plotchar(40+j*10, 40+i*10, i*16+j, GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK);
+		}
+	}
+
+	glcd_plotstring(40, 220, "Touch the screen to exit", GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+
+	/* Wait for the screen to be (re)touched */
+	while (touchscreen_ispressed(touchscreen_pressure())) {}
+	while (!touchscreen_ispressed(touchscreen_pressure())) {}
 }
