@@ -19,7 +19,6 @@
 %%% The Current Maintainer of this work is J.E.J. op den Brouw.
 
 
-
 \documentclass[12pt]{article}
 
 \usepackage{parskip}
@@ -152,7 +151,7 @@ main.c                  -- place in Core/Src, demo using functions
 
 
 \section{Running the demo}
-If you have set up tyour projects just start compilation using \texttt{Project}$\rightarrow$\texttt{Build Project}. Then start the the demo using \texttt{Run}$\rightarrow$\texttt{Run}. The demo starts by asking you to touch one of four rectangles to start the GLCD demo, the touchscreen demo, the rotation demo or the character set demo, see Figure~\ref{fig:2}. At the end of the GLCD demo, there will be a list of running times for selected graphic functions as can be seen in Figure~\ref{fig:3}.
+If you have set up your project just start compilation using \texttt{Project}$\rightarrow$\texttt{Build Project}. Then start the the demo using \texttt{Run}$\rightarrow$\texttt{Run}. The demo starts by asking you to touch one of four rectangles to start the GLCD demo, the touchscreen demo, the rotation demo or the character set demo, see Figure~\ref{fig:2}. At the end of the GLCD demo, there will be a list of running times for selected graphic functions as can be seen in Figure~\ref{fig:3}.
 
 \begin{figure}[!ht]
 \centering
@@ -179,7 +178,7 @@ Bits 7-0: blue -- only upper 6 bits are used
 
 \textbf{Note:} The 16 bit color specification in \textbf{NOT} supported, but they can be converted. See \S~\ref{sec:convertcolors}.
 
-Please note that although 8 bits per color can be specified, only the upper 6 bits of each color are used, since the display uses 18 bits of color infomation. The lower 2 bits of each color are ignored. This means that color \lstinline|0x000000| and \lstinline|0x000001| are displayed the same, but are different is compares.
+Please note that although 8 bits per color can be specified, only the upper 6 bits of each color are used, since the display uses 18 bits of color infomation. The lower 2 bits of each color are ignored. This means that color \lstinline|0x000000| and \lstinline|0x000001| are displayed the same, but are different in compares.
 
 The color is specified using the the type \lstinline|glcd_color_t|.
 
@@ -228,13 +227,14 @@ If you use the internal HSI (\lstinline|HSIVALUE|), the frequency is 16 MHz by d
 Initialize the display by calling the \lstinline|glcd_init()| function. After calling that function the display is initialized and ready for use.
 
 \subsubsection{Initialize display}
+Note: call this function \textbf{after} the clock system is set up.
+
 This function must be called after the clock system is set up and before using any other GLCD functions. The function prototype is:
 \begin{lstlisting}
 void glcd_init(void);
 \end{lstlisting}
 
 \subsection{Very low GLCD functions}
-Note: call these function \textbf{after} the clock system is set up.
 
 \subsubsection{Setting the write delay}
 \textbf{Note:} use with care.\\
@@ -242,7 +242,6 @@ Sets the delay for write actions. There is no need to call this function as the 
 \begin{lstlisting}
 void glcd_set_write_pulse_delay(uint32_t delay);
 \end{lstlisting}
-
 
 \subsubsection{Setting the read delay}
 \textbf{Note:} use with care.\\
@@ -256,7 +255,7 @@ glcd_set_set_read_pulse_delay(uint32_t delay);
 There are a number of low level functions. They are normally not needed.
 
 \subsubsection{Reading data from the display}
-Te read data from the display, use the function \lstinline|glcd_read_terminate|. Reading is explictly terminated. The function prototype is:
+Te read data from the display, use the function \lstinline|glcd_read_terminate|. Reading is explicitly terminated. The function prototype is:
 
 \begin{lstlisting}
 void glcd_read_terminate(uint16_t cmd,            // The command
@@ -315,7 +314,7 @@ GLCD_SCREEN_ROT270         // Rotate 270 degrees
 
 Notes on rotation:
 
-When you rotate the display, the current display contents is not deleted. You have to clear the display explicitly.
+When you rotate the display, the current display contents are not deleted. You have to clear the display explicitly.
 
 The default rotation is 0$^\circ$. The display is in landscape with the SD-card socket on the right of the display. A rotation of 90$^\circ$ sets the display is portrait mode with the SD-card socket at the bottom of the display. A rotation of 180$^\circ$ sets the display in landscape mode with the SD-card socket to the left of the Display. A rotation of 270$^\circ$ set the display in portrait mode with the SD-card socket at the top of the display.
 
@@ -374,7 +373,7 @@ void glcd_plotline(uint16_t x0,            // x start point
 \end{lstlisting}
 
 \subsubsection{Plot a character using buildin font}
-To plot a character using the buildin font (5x8), use:
+To plot a character using the buildin font (6x8), use:
 \begin{lstlisting}
 void glcd_plotchar(uint16_t x,             // x coordinate
                    uint16_t y,             // y coordinate
@@ -384,7 +383,7 @@ void glcd_plotchar(uint16_t x,             // x coordinate
 \end{lstlisting}
 
 Note: character is one of 0 -- 255 (no special C treatment)\\
-Note: if \lstinline|color| is equal to \lstinline|bg| then pixels having background color are not printed! 
+Note: if \lstinline|color| is equal to \lstinline|bg| then pixels having background color are not printed!
 
 \subsubsection{Plot a string using buildin font}
 To plot a string using the buildin font, use:
@@ -398,7 +397,7 @@ void glcd_plotstring(uint16_t x,                  // x coordinate
 \end{lstlisting}
 
 Note: a \lstinline|\0| terminates a string (as in C). This means that buildin character 0 cannot be printed\\
-Note: if \lstinline|color| is equal to \lstinline|bg| then pixels having background color are not printed!\\
+Note: if \lstinline|color| is equal to \lstinline|bg| then pixels having background color are not printed\\
 Note: \lstinline|spacing| is one of:
 \begin{lstlisting}
 GLCD_STRING_CONDENSED  // zero pixels apart
@@ -448,6 +447,20 @@ void glcd_plotarc(uint16_t xc,                // center x coordinate
 
 Note: this function is only available if \lstinline|GLCD_USE_ARC| is defined.\\
 Note: this function uses \lstinline|sinf| and \lstinline|cosf| math functions, using the onboard FPU.
+
+\subsubsection{Plot a triangle}
+To plot a triangle, use:
+
+\begin{lstlisting}
+void glcd_plottriangle(uint16_t x1,          // start x
+                       uint16_t y1,          // start y
+                       uint16_t x2,          // second x
+                       uint16_t y2,          // second y
+                       uint16_t x3,          // last x
+                       uint16_t y3,          // last y
+                       glcd_color_t color);  // color
+\end{lstlisting}
+
 
 \subsubsection{Plot a 2-color bitmap}
 To plot a 2-color bitmap, use:
@@ -580,7 +593,7 @@ There are a number of \lstinline|#define|'s that can be manipulated to taylor th
 
 \begin{lstlisting}
 #define GLCD_USE_FLOOD_FILL
-#define GLCD_STACK_SIZE (2000)
+#define GLCD_STACK_SIZE (2000)\
 #define GLCD_USE_FLOOD_FILL_PRINT_IF_STACK_OVERFLOW
 #define GLCD_USE_ARC
 
