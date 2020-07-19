@@ -7,8 +7,8 @@
 
 Software License Agreement (BSD License)
 
-Version: 0.1
-Date: 2020/07/15
+Version: 0.1rc1
+Date: 2020/07/19
 
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
@@ -38,6 +38,13 @@ POSSIBILITY OF SUCH DAMAGE.
 
  */
 
+#if !defined(STM32F446xx) && !defined(STM32F411xx)
+#warning !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#warning ! Only tested with STM32F446 Nucleo Board !
+#warning ! Only tested with STM32F411 Nucleo Board !
+#warning !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#endif
+
 #include <stdio.h>
 #include <math.h>
 
@@ -63,6 +70,11 @@ POSSIBILITY OF SUCH DAMAGE.
  /* Do time measurements of the GLCD functions */
 #define MEASUREMENT
 
+/* Let's see if we can plot an 256-color indexed picture */
+#define HAVE_WOOF
+
+/* For testing purposes */
+#define USE_TEST
 
 
 #ifdef MEASUREMENT
@@ -92,7 +104,7 @@ POSSIBILITY OF SUCH DAMAGE.
 								  "Plot bitmap:            ", \
 								  "Printing 53 chars (10x):", \
 								  "Print + vertical shift: ", \
-								  "Not used                ", \
+								  "Plot picture:           ", \
 								  "Not used                ", \
 								  "Not used                ", \
 								  "Not used                ", \
@@ -121,8 +133,17 @@ void demo_touchscreen(void);
 void demo_glcd(void);
 void demo_rotation(void);
 void demo_characterset(void);
+#ifdef USE_TEST
+void test(void);
+#endif
+
+#ifdef HAVE_WOOF
+extern const uint8_t woof_map[];
+#endif
 
 int main(void) {
+
+	SystemInit();
 
 #ifdef USEMAXMHZ
 
@@ -209,16 +230,22 @@ int main(void) {
 
 		glcd_plotrectfill(20, 190, 20, 20, GLCD_COLOR_YELLOW);
 		glcd_plotstring(50, 196, "Touch rectangle to show character set", GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+
+#ifdef USE_TEST
+		glcd_plotrectfill(20, 220, 20, 20, GLCD_COLOR_YELLOW);
+		glcd_plotstring(50, 226, "Test", GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+#endif
+
 		/* Get a coordinate from the touchscreen */
 		while (1) {
 
 			/* Wait for the screen to be touched */
 			while (!touchscreen_ispressed(touchscreen_pressure())) {}
 
-			raw = touchscreen_readx();
+			raw = touchscreen_readrawx();
 			x = touchscreen_map(raw, TOUCH_LEFT, TOUCH_RIGHT, 0, glcd_getwidth());
 
-			raw = touchscreen_ready();
+			raw = touchscreen_readrawy();
 			y = touchscreen_map(raw, TOUCH_BOTTOM, TOUCH_TOP, 0, glcd_getheight());
 
 			if (x>=20 && x<=20+20 && y>=100 && y<=100+20) {
@@ -237,6 +264,12 @@ int main(void) {
 				demo_characterset();
 				break;
 			}
+#ifdef USE_TEST
+			if (x>=20 && x<=20+20 && y>=220 && y<=220+20) {
+				test();
+				break;
+			}
+#endif
 		}
 	}
 
@@ -264,11 +297,11 @@ void demo_touchscreen(void) {
 	/* Now read in x and y and pressure */
 	while (1) {
 		/* Read raw X coordinate and map it to screen coordinate */
-		xraw = touchscreen_readx();
+		xraw = touchscreen_readrawx();
 		x = touchscreen_map(xraw, TOUCH_LEFT, TOUCH_RIGHT, 0, glcd_getwidth());
 
 		/* Read raw Y coordinate and map it to screen coordinate */
-		yraw = touchscreen_ready();
+		yraw = touchscreen_readrawy();
 		y = touchscreen_map(yraw, TOUCH_BOTTOM, TOUCH_TOP, 0, glcd_getheight());
 
 		/* Read raw pressure */
@@ -348,6 +381,14 @@ void demo_glcd(void) {
 	}
 	GET_CLOCK(5);
 
+	glcd_puts("Plotting 100 filled circles...\n");
+	START_CLOCK();
+	for (i = 0; i < 100; i++) {
+		glcd_plotcirclefill(60, 180, 50, color);
+		color += 0x030104;
+	}
+	GET_CLOCK(18);
+
 	glcd_puts("\fFilling objects...\n");
 
     START_CLOCK();
@@ -406,7 +447,7 @@ void demo_glcd(void) {
 	/* Plot the complete character table */
 	for (i=0; i<8; i++) {
 		for (j=0; j<32; j++) {
-			glcd_plotchar( 10+j*6, 120+i*9, i*32+j, GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK);
+			glcd_plotchar( 10+j*6, 120+i*9, i*32+j, GLCD_COLOR_YELLOW, GLCD_COLOR_YELLOW);
 		}
 	}
 
@@ -472,6 +513,14 @@ void demo_glcd(void) {
 
 	glcd_delay_ms(2000);
 
+#ifdef HAVE_WOOF
+	/* Plot the image */
+	START_CLOCK();
+	glcd_plotbitmap8bpp(0, 0, 320, 240, woof_map, NULL);
+    GET_CLOCK(13);
+#endif
+
+	glcd_delay_ms(2000);
 
 	/* Measurement of 50 ms */
     START_CLOCK();
@@ -515,10 +564,10 @@ void demo_rotation(void) {
 	/* Get a coordinate from the touchscreen */
 	while (1) {
 
-		raw = touchscreen_readx();
+		raw = touchscreen_readrawx();
 		y = touchscreen_map(raw, TOUCH_LEFT, TOUCH_RIGHT, 0, glcd_getheight());
 
-		raw = touchscreen_ready();
+		raw = touchscreen_readrawy();
 		x = glcd_getwidth() - touchscreen_map(raw, TOUCH_BOTTOM, TOUCH_TOP, 0, glcd_getwidth());
 
 		p = touchscreen_pressure();
@@ -556,10 +605,10 @@ void demo_rotation(void) {
 	/* Get a coordinate from the touchscreen */
 	while (1) {
 
-		raw = touchscreen_readx();
+		raw = touchscreen_readrawx();
 		x = glcd_getwidth() - touchscreen_map(raw, TOUCH_LEFT, TOUCH_RIGHT, 0, glcd_getwidth());
 
-		raw = touchscreen_ready();
+		raw = touchscreen_readrawy();
 		y = glcd_getheight() - touchscreen_map(raw, TOUCH_BOTTOM, TOUCH_TOP, 0, glcd_getheight());
 
 		p = touchscreen_pressure();
@@ -597,10 +646,10 @@ void demo_rotation(void) {
 	/* Get a coordinate from the touchscreen */
 	while (1) {
 
-		raw = touchscreen_readx();
+		raw = touchscreen_readrawx();
 		y = glcd_getheight() - touchscreen_map(raw, TOUCH_LEFT, TOUCH_RIGHT, 0, glcd_getheight());
 
-		raw = touchscreen_ready();
+		raw = touchscreen_readrawy();
 		x = touchscreen_map(raw, TOUCH_BOTTOM, TOUCH_TOP, 0, glcd_getwidth());
 
 		p = touchscreen_pressure();
@@ -650,3 +699,25 @@ void demo_characterset(void) {
 	while (touchscreen_ispressed(touchscreen_pressure())) {}
 	while (!touchscreen_ispressed(touchscreen_pressure())) {}
 }
+
+#ifdef USE_TEST
+void test(void) {
+
+	glcd_putchar('\f');
+
+//	glcd_plotrectrounded(100, 100, 100, 40, 15, GLCD_COLOR_YELLOW);
+//	glcd_plotstring(120,120, "Tekst", GLCD_COLOR_YELLOW, GLCD_COLOR_YELLOW, GLCD_STRING_NORMAL);
+//	glcd_floodfill(100+15, 100+20, GLCD_COLOR_RED, GLCD_COLOR_BLACK);
+
+//	glcd_plotcirclefill(100, 100, 30, GLCD_COLOR_YELLOW);
+	glcd_plotcirclehalffill(100, 100, 30, GLCD_CORNER_BOTH, -5, GLCD_COLOR_YELLOW);
+//	glcd_plotcircle(180, 180, 30, GLCD_COLOR_YELLOW);
+//	glcd_floodfill(180, 180, GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK);
+
+//	glcd_plotrectroundedfill((glcd_getwidth()-100)/2, (glcd_getheight()-50)/2, 100, 50, 15, GLCD_COLOR_YELLOW);
+
+	/* Wait for the screen to be (re)touched */
+	while (touchscreen_ispressed(touchscreen_pressure())) {}
+	while (!touchscreen_ispressed(touchscreen_pressure())) {}
+}
+#endif

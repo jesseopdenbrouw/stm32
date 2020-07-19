@@ -7,8 +7,8 @@
 
 Software License Agreement (BSD License)
 
-Version: 0.2
-Date: 2020/07/17
+Version: 0.1rc1
+Date: 2020/07/19
 
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
@@ -106,7 +106,7 @@ static const digitalchannel_t digitalchannels[] =
 /* The ADC to use */
 static ADC_TypeDef *pADC;
 /* Buffer for the samples */
-uint32_t samples[TOUCH_SAMPLES];
+static uint32_t samples[TOUCH_SAMPLES];
 
 
 /* Taken from the Adafruit library
@@ -168,6 +168,7 @@ uint32_t touchscreen_init(ADC_TypeDef *used_ADC) {
 	}
 
 	/* ADC Clock, 168 / 30 = 5.6 --> prescaler = 8, for all ADCs */
+	/* The ADC doesn't have to be that fast for the touchscreen functions */
 	ADC->CCR = (3 << ADC_CCR_ADCPRE_Pos);
 
 	/* ADC1 active */
@@ -197,13 +198,13 @@ uint32_t touchscreen_init(ADC_TypeDef *used_ADC) {
 	return 1;
 }
 
-/* Function touchscreen_readx
- * Reads X coordinate od touchscreen (RAW)
+/* Function touchscreen_readrawx
+ * Reads X coordinate of touchscreen (RAW)
  * @public
  * @in: void
  * @out: raw X-value
  */
-uint32_t touchscreen_readx(void) {
+uint32_t touchscreen_readrawx(void) {
 
 	uint32_t XMmoder, YPmoder;
 
@@ -253,13 +254,13 @@ uint32_t touchscreen_readx(void) {
 	return 1023 - samples[TOUCH_SAMPLES/2];
 }
 
-/* Function touchscreen_ready
- * Reads Y coordinate od touchscreen (RAW)
+/* Function touchscreen_readrawy
+ * Reads Y coordinate of touchscreen (RAW)
  * @public
  * @in: void
  * @out: raw Y-value
  */
-uint32_t touchscreen_ready(void) {
+uint32_t touchscreen_readrawy(void) {
 
 	uint32_t XMmoder, YPmoder;
 

@@ -7,8 +7,8 @@
 
 Software License Agreement (BSD License)
 
-Version: 0.2
-Date: 2020/07/17
+Version: 0.1rc1
+Date: 2020/07/19
 
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
@@ -47,7 +47,7 @@ extern "C"
 #endif
 
 /* Driver version */
-#define GLCD_VERSION "STM32 VMA412 GLCD Driver Version 0.2 (Jul 17 2020)"
+#define GLCD_VERSION "STM32 VMA412 GLCD Driver v 0.1rc1 (Jul 19 2020)"
 
 
 /* Should we use flood fill? */
@@ -95,6 +95,18 @@ typedef enum {GLCD_DISPLAY_IDLE_OFF=0, GLCD_DISPLAY_IDLE_ON=1} glcd_display_idle
 
 /* To turn the display on or off */
 typedef enum {GLCD_DISPLAY_OFF=0, GLCD_DISPLAY_ON=1} glcd_display_t;
+
+/* To draw quarter circles */
+typedef enum {GLCD_CORNER_UPPER_LEFT=1, GLCD_CORNER_UPPER_RIGHT=2, GLCD_CORNER_LOWER_RIGHT=4, GLCD_CORNER_LOWER_LEFT=8} glcd_corner_t;
+//typedef glcd_corner_t uint16_t;
+//#define GLCD_CORNER_UPPER_LEFT 1
+//#define GLCD_CORNER_UPPER_RIGHT 2
+//#define GLCD_CORNER_LOWER_RIGHT 4
+//#define GLCD_CORNER_LOWER_LEFT 8
+
+/* To draw left, right of both corner halves */
+typedef enum {GLCD_CORNER_LEFT_HALF=1, GLCD_CORNER_RIGHT_HALF=2, GLCD_CORNER_BOTH=3} glcd_cornerhalves_t;
+
 
 /* For low level commands */
 /* How to use the CS pin */
@@ -181,14 +193,21 @@ void glcd_plotstring(uint16_t x, uint16_t y, char str[], glcd_color_t color, glc
 /* Plot shapes */
 void glcd_plotrect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, glcd_color_t color);
 void glcd_plotrectfill(uint16_t x, uint16_t y, uint16_t w, uint16_t h, glcd_color_t color);
+void glcd_plotrectrounded(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t r, glcd_color_t color);
+void glcd_plotrectroundedfill(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t r, glcd_color_t color);
 void glcd_plotcircle(uint16_t x0, uint16_t y0, uint16_t r, glcd_color_t color);
+void glcd_plotcirclefill(uint16_t x0, uint16_t y0, uint16_t r, glcd_color_t color);
+void glcd_plotcirclequarter(uint16_t x0, uint16_t y0, uint16_t r, glcd_corner_t cornername, glcd_color_t color);
+void glcd_plotcirclehalffill(uint16_t x0, uint16_t y0, uint16_t r, glcd_cornerhalves_t corners, int16_t delta, glcd_color_t color);
 #ifdef GLCD_USE_ARC
 void glcd_plotarc(uint16_t xc, uint16_t yc, uint16_t r, float start, float stop, glcd_color_t color);
 #endif
 void glcd_plottriangle(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t x3, uint16_t y3, glcd_color_t color);
 
-/* Plot a two-color bitmap on the screen */
+/* Plot a two-color bitmap on the display */
 void glcd_plotbitmap(uint16_t x, uint16_t y, const uint8_t bitmap[], uint16_t w, uint16_t h, glcd_color_t color, glcd_color_t bg);
+/* Plot a 256-color indexed bitmap on the display */
+void glcd_plotbitmap8bpp(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint8_t *pic, const uint8_t *palette);
 
 /* Turn display inversion on or off */
 void glcd_inversion(glcd_display_inversion_t what);

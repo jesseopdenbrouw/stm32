@@ -1,10 +1,10 @@
 
 %%% glcd_and_touchscreen_functions_for_velleman_VMA412.tex
 %%%
-%%%   Documentation for  version 0.2
+%%%   Documentation for version 0.3
 %%%
 %%%
-%%% Copyright 20205 J.E.J. op den BRouw
+%%% Copyright 2020 J.E.J. op den BRouw
 %%%
 %%% This work may be distributed and/or modified under the
 %%% conditions of the LaTeX Project Public License, either version 1.3
@@ -37,7 +37,7 @@
     xleftmargin=1em
 }
 
-\author{Version 0.2\\[2ex]Jesse op den Brouw\thanks{Please mail me at: \href{mailto:J.E.J.opdenBrouw@hhs.nl}{J.E.J.opdenBrouw@hhs.nl}}\\The Hague University of Applied Sciences\\(THUAS)}
+\author{Version 0.1rc1\\[2ex]Jesse op den Brouw\thanks{Please mail me at: \href{mailto:J.E.J.opdenBrouw@hhs.nl}{J.E.J.opdenBrouw@hhs.nl}}\\The Hague University of Applied Sciences\\(THUAS)}
 \title{Graphic LCD and Touchscreen Functions for Velleman VMA412 with ILI9341 Controller used with a STM32F446 Nucleo Board}
 \date{\today}
 
@@ -208,7 +208,7 @@ To use your own color, please use the color type \lstinline|glcd_color_t|:
 glcd_color_t SkyBlue2 = (126<<16)|(192<<8)|238
 \end{lstlisting}
 
-at taken for the \LaTeX\ \lstinline|xcolor| package (\url{https://www.ctan.org/pkg/xcolor}).
+as taken for the \LaTeX\ \lstinline|xcolor| package (\url{https://www.ctan.org/pkg/xcolor}).
 
 Note: don't ever change the type \lstinline|glcd_color_t|.
 
@@ -336,6 +336,9 @@ void glcd_plotpixel(uint16_t x,           // x coordinate
                     glcd_color_t color);  // color
 \end{lstlisting}
 
+Note: if \lstinline|x| is greater that the width of the display minus 1, the pixel is not plotted.\\
+Note: if \lstinline|y| is greater that the height of the display, minus 1, the pixel is not plotted.\\
+
 \subsubsection{Read a pixel}
 To read a pixel (getting color information) in 32-bit version, use:
 
@@ -343,6 +346,9 @@ To read a pixel (getting color information) in 32-bit version, use:
 glcd_color_t glcd_readpixel(uint16_t x,   // x coordinate
                             uint16_t y);  // y coordinate
 \end{lstlisting}
+
+Note: if \lstinline|x| is greater that the width of the display minus 1, the returned color is undefined.\\
+Note: if \lstinline|y| is greater that the height of the display, minus 1, the returned color is undefined.\\
 
 \subsubsection{Plot a horizontal line}
 To plot a horizontal line (fast), use:
@@ -353,6 +359,8 @@ void glcd_plothorizontalline(uint16_t x,           // x coordinate
                              glcd_color_t color);  // color
 \end{lstlisting}
 
+Note: if \lstinline|x+w| is greater than the width of the display minus 1, the pixels in excess are not plotted.
+
 \subsubsection{Plot a vertical line}
 To plot a vertical line (fast), use:
 \begin{lstlisting}
@@ -361,6 +369,7 @@ void glcd_plotverticalline(uint16_t x              // x coordinate
                            uint16_t h,             // height
                            glcd_color_t color);    // color
 \end{lstlisting}
+Note: if \lstinline|y+h| is greater than the height of the display minus 1, the pixels in excess are not plotted.
 
 \subsubsection{Plot a line with any angle and length}
 To plot a line with any angle and length, use:
@@ -372,8 +381,10 @@ void glcd_plotline(uint16_t x0,            // x start point
                    glcd_color_t color);    // color
 \end{lstlisting}
 
+Note: the part of the line that is exceeding the physical dimensions of the display are not plotted.
+
 \subsubsection{Plot a character using buildin font}
-To plot a character using the buildin font (6x8), use:
+To plot a character using the buildin font (5x8), use:
 \begin{lstlisting}
 void glcd_plotchar(uint16_t x,             // x coordinate
                    uint16_t y,             // y coordinate
@@ -415,7 +426,9 @@ void glcd_plotrect(uint16_t x,             // x coordinate
                    glcd_color_t color);    // color
 \end{lstlisting}
 
-\subsubsection{Plot a filled recangle}
+Note: \lstinline|x| and \lstinline|y| specify the upper left corner.
+
+\subsubsection{Plot a filled rectangle}
 To plot a filled rectangle, use:
 \begin{lstlisting}
 void glcd_plotrectfill(uint16_t x,            // x coordinate
@@ -425,6 +438,36 @@ void glcd_plotrectfill(uint16_t x,            // x coordinate
                        glcd_color_t color);   // color
 \end{lstlisting}
 
+Note: \lstinline|x| and \lstinline|y| specify the upper left corner.
+
+\subsubsection{Plot a rectangle with rounded corners}
+To plot a rectangle with rounded corners, use:
+
+\begin{lstlisting}
+void glcd_plotrectrounded(uint16_t x,           // x coordinate
+                          uint16_t y,           // y coordinate
+                          uint16_t w,           // width
+                          uint16_t h,           // height
+                          uint16_t r,           // radius
+                          glcd_color_t color);  // color
+\end{lstlisting}
+
+Note: \lstinline|x| and \lstinline|y| specify the upper left corner as plotted with \lstinline|glcd_plotrect|.
+
+\subsubsection{Plot a filled rectangle with rounded corners}
+To plot a filled rectangle with rounded corners, use:
+
+\begin{lstlisting}
+void glcd_plotrectroundedfill(uint16_t x,           // x coordinate
+                              uint16_t y,           // y coordinate
+                              uint16_t w,           // width
+                              uint16_t h,           // height
+                              uint16_t r,           // radius
+                              glcd_color_t color);  // color
+\end{lstlisting}
+
+Note: \lstinline|x| and \lstinline|y| specify the upper left corner as plotted with \lstinline|glcd_plotrect|.
+
 \subsubsection{Plot a circle}
 To plot a circle, use:
 \begin{lstlisting}
@@ -433,6 +476,46 @@ void glcd_plotcircle(uint16_t x0,             // center x coordinate
                      uint16_t r,              // radius
                      glcd_color_t color);     // color
 \end{lstlisting}
+
+\subsubsection{Plot a filled circle}
+To plot a filled circle, use:
+\begin{lstlisting}
+void glcd_plotcircle(uint16_t x0,             // center x coordinate
+                     uint16_t y0,             // center y coordinate
+                     uint16_t r,              // radius
+                     glcd_color_t color);     // color
+\end{lstlisting}
+
+\subsubsection{Plot quarters of a circle}
+To plot quarters of a circle, use:
+\begin{lstlisting}
+void glcd_plotcirclequarter(uint16_t x0,               -- center x
+                            uint16_t y0,               -- center y
+                            uint16_t r,                -- radius
+                            glcd_corner_t cornername,  -- corners
+                            glcd_color_t color);       -- color
+\end{lstlisting}
+
+Note: this function doesn't plot the start and end points\\
+Note: \lstinline|cornername| is one of or a composition of: 
+\lstinline|GLCD_CORNER_UPPER_LEFT|,\\ \lstinline|GLCD_CORNER_UPPER_RIGHT|, \lstinline|GLCD_CORNER_LOWER_RIGHT| and \lstinline|GLCD_CORNER_LOWER_LEFT|
+
+\subsubsection{Plot and fill left and/or right halves of a circle}
+To plot and fill left and/or right halves of a circle, use:
+
+\begin{lstlisting}
+void glcd_plotcirclehalffill(uint16_t x0,                 -- center x
+                             uint16_t y0,                 -- center y
+                             uint16_t r,                  -- radius
+                             glcd_cornerhalves_t corners, -- see notes
+                             int16_t delta,               -- see notes
+                             glcd_color_t color);         -- color
+\end{lstlisting}
+
+Notes \lstinline|delta| is the squeeze factor, positive squeezes left/right, negative squeezes top/bottom, 0 for plain circle.\\
+Note: \lstinline|corners| is one of \lstinline|GLCD_CORNER_LEFT_HALF|, \lstinline|GLCD_CORNER_RIGHT_HALF| and\\ \lstinline|GLCD_CORNER_BOTH|.\\
+Note: doesn't plot the outer top-to-bottom vertical line. 
+
 
 \subsubsection{Plot an arc}
 To plot an arc, use:
@@ -476,9 +559,28 @@ void glcd_plotbitmap(uint16_t x,              // x coordinate
 
 Note: \lstinline|bitmap| consists of bytes (\lstinline|uint8_t|). A 1 in a byte is converted to \lstinline|color|, a 0 in a byte is converted to \lstinline|bg|.
 
-Note: you will get compiler warnings of your bitmap is in RAM.
+Note: you will get compiler warnings if your bitmap is in RAM, because \lstinline|bitmap| is qualified as \lstinline|const|.
 
 Note: if you need to convert your image to a 2-bit color bitmap, have a look at \url{https://lvgl.io/tools/imageconverter}.
+
+\subsubsection{Plot a 256-color indexed bitmap}
+To plot a 256-color indexed bitmap, use:
+\begin{lstlisting}
+void glcd_plotbitmap8bpp(uint16_t x,               // x start point
+                         uint16_t y,               // y start point
+                         uint16_t w,               // width
+                         uint16_t h,               // height
+                         const uint8_t *pic,       // start of image
+                         const uint8_t *palette);  // start of palette
+\end{lstlisting}
+
+Note: each pixel is specified with a byte (\lstinline|uint8_t|). This is an index into the palette.\\
+Note: each color is specified with a 32-bit RGB color specification. This means that each color takes up four bytes and the total palette size is 1024 bytes. The byte order for each indexed color is as follows: first byte is red, second byte is green, third byte is blue, fourth byte is not used.\\
+Note: is \lstinline|palette| is equal to \lstinline|NULL| then the palette is at the start of the image and the image bytes follow the palette.
+
+Note: you will get compiler warnings if your bitmap is in RAM, because \lstinline|bitmap| is qualified as \lstinline|const|.
+
+Note: if you need to convert your image to a 256-color indexed image, have a look at \url{https://lvgl.io/tools/imageconverter}.
 
 \subsubsection{Display inversion}
 Sets the display inversion (or not):
@@ -547,14 +649,14 @@ To use a simple console based character printing, use:
 void glcd_putchar(char c);
 \end{lstlisting}
 
-Note: characters are printed in yellow, background is black\\
-Note: \lstinline|\f| (form feed) clears the display\\
-Note: \lstinline|\n| returns and goes to the next line\\
-Note: \lstinline|\r| return to the beginning of the line\\
-Note: \lstinline|\b| erases last character and goes one character back (ultimate to the beginning of the line)\\
-Note: all other characters are printed using the internal font\\
-Note: if a character ``falls off'' the display, line wrap will be used, may cause a vertical shift\\
-Note: \lstinline|\t| is currenty not handled
+Note: characters are printed in yellow, background is black.\\
+Note: \lstinline|\f| (form feed) clears the display.\\
+Note: \lstinline|\n| returns and goes to the next line, may cause a vertical shift.\\
+Note: \lstinline|\r| return to the beginning of the line.\\
+Note: \lstinline|\b| erases last character and goes one character back (ultimate to the beginning of the line).\\
+Note: \lstinline|\t| creates tab stops at 8 character intervals\\Note: all other characters are printed using the internal font.\\
+Note: if a character ``falls off'' the display, line wrap will be used, may cause a vertical shift.\\
+Note: this function is aware of the current display rotation.
 
 \subsubsection{Console based string printing}
 To use a simple console based string printing use:
@@ -562,7 +664,9 @@ To use a simple console based string printing use:
 void glcd_puts(char str[]);
 \end{lstlisting}
 
-Note: see $\S$\ref{sec:consolebasedcharacterprinting} for character handling.
+Note: \lstinline|str| is terminated with \lstinline|\0| (as in C).\\
+Note: see $\S$\ref{sec:consolebasedcharacterprinting} for character handling.\\
+Note: if \lstinline|str| equals \lstinline|NULL|, then \lstinline|(null)| is printed.
 
 \subsubsection{Get the current display width}
 To get the current display width, use:
@@ -593,7 +697,7 @@ There are a number of \lstinline|#define|'s that can be manipulated to taylor th
 
 \begin{lstlisting}
 #define GLCD_USE_FLOOD_FILL
-#define GLCD_STACK_SIZE (2000)\
+#define GLCD_STACK_SIZE (2000)
 #define GLCD_USE_FLOOD_FILL_PRINT_IF_STACK_OVERFLOW
 #define GLCD_USE_ARC
 
@@ -622,26 +726,12 @@ Before using any of the touchscreen functions, you have to initialize the touchs
 Please note that the ADC is setup for 10-bit conversions so the values returned are from 0 to 1023 (inclusive).
 
 \subsection{Touchscreen low level functions}
-There are none.
-
-\subsection{Touchscreen high level functions}
-
-\subsubsection{Initializing the touchscreen}
-To initialize the touchscreen, use:
-
-\begin{lstlisting}
-uint32_t touchscreen_init(ADC_TypeDef *used_ADC);
-\end{lstlisting}
-
-Note: this function must be called after the clock system is set up.\\
-Note: \lstinline|used_ADC| is an ADC handle. Currently only \lstinline|ADC1| and \lstinline|ADC2| are supported. \lstinline|ADC3| is currently \textbf{not} supported.\\
-Note: if the initialization succeeds an 1 is return, if failing a 0 is returned.
 
 \subsubsection{Read raw X position}
 To read the current raw X position, use:
 
 \begin{lstlisting}
-uint32_t touchscreen_readx(void);
+uint32_t touchscreen_readrawx(void);
 \end{lstlisting}
 
 Note: this value is only of interest if the touchscreen is pressed\\
@@ -651,7 +741,7 @@ Note: returns the raw X position from the touchscreen. This value is an indicati
 To read the current raw y position, use:
 
 \begin{lstlisting}
-uint32_t touchscreen_ready(void);
+uint32_t touchscreen_readrawy(void);
 \end{lstlisting}
 
 Note: this value is only of interest if the touchscreen is pressed\\
@@ -706,6 +796,19 @@ b = - a\cdot tlow;
 
 Note: if $thigh = tlow$ the value \lstinline|INT_MIN| is returned.
 
+\subsection{Touchscreen high level functions}
+
+\subsubsection{Initializing the touchscreen}
+To initialize the touchscreen, use:
+
+\begin{lstlisting}
+uint32_t touchscreen_init(ADC_TypeDef *used_ADC);
+\end{lstlisting}
+
+Note: this function must be called after the clock system is set up.\\
+Note: \lstinline|used_ADC| is an ADC handle. Currently only \lstinline|ADC1| and \lstinline|ADC2| are supported. \lstinline|ADC3| is currently \textbf{not} supported.\\
+Note: if the initialization succeeds a 1 is return, if failing a 0 is returned.
+
 \subsubsection{Testing if the touchscreen is pressed}
 To test whether the screen is touched, use:
 
@@ -728,10 +831,10 @@ When the display is rotated 0$^\circ$, use:
 uint16_t raw;
 int16_t x, y;
 
-raw = touchscreen_readx();
+raw = touchscreen_readrawx();
 x = touchscreen_map(raw, TOUCH_LEFT, TOUCH_RIGHT, 0, glcd_getwidth());
 
-raw = touchscreen_ready();
+raw = touchscreen_readrawy();
 y = touchscreen_map(raw, TOUCH_BOTTOM, TOUCH_TOP, 0, glcd_getheight());
 \end{lstlisting}
 
@@ -741,10 +844,10 @@ When the display is rotated 90$^\circ$, use:
 uint16_t raw;
 int16_t x, y;
 
-raw = touchscreen_readx();
+raw = touchscreen_readrawx();
 y = touchscreen_map(raw, TOUCH_LEFT, TOUCH_RIGHT, 0, glcd_getheight());
 
-raw = touchscreen_ready();
+raw = touchscreen_readrawy();
 x = glcd_getwidth() - touchscreen_map(raw, TOUCH_BOTTOM, TOUCH_TOP,
                                       0, glcd_getwidth());
 \end{lstlisting}
@@ -757,11 +860,11 @@ When the display is rotated 180$^\circ$, use:
 uint16_t raw;
 int16_t x, y;
 
-raw = touchscreen_readx();
+raw = touchscreen_readrawx();
 x = glcd_getwidth() - touchscreen_map(raw, TOUCH_LEFT, TOUCH_RIGHT,
                                       0, glcd_getwidth());
 
-raw = touchscreen_ready();
+raw = touchscreen_readrawy();
 y = glcd_getheight() - touchscreen_map(raw, TOUCH_BOTTOM, TOUCH_TOP,
                                        0, glcd_getheight());
 \end{lstlisting}
@@ -772,11 +875,11 @@ When the display is rotated 270$^\circ$, use:
 uint16_t raw;
 int16_t x, y;
 
-raw = touchscreen_readx();
+raw = touchscreen_readrawx();
 y = glcd_getheight() - touchscreen_map(raw, TOUCH_LEFT, TOUCH_RIGHT,
                                        0, glcd_getheight());
 
-raw = touchscreen_ready();
+raw = touchscreen_readrawy();
 x = touchscreen_map(raw, TOUCH_BOTTOM, TOUCH_TOP, 0, glcd_getwidth());
 \end{lstlisting}
 
@@ -793,7 +896,7 @@ Whether the touchscreen is pressed or not is calculated according to raw touchsc
 
 Note all values must be within the values 0 to 1023 (inclusive).
 
-Reading raw values is done by oversamping and then the mean of the samples is returned. You can set the number of samples using the define \lstinline|TOUCH_SAMPLES|. The default value is 16. This value must be 2 or greater.
+Reading raw values is done by oversamping and then the mean of the samples is returned. You can set the number of samples using the define \lstinline|TOUCH_SAMPLES|. The default value is 16. This value must be 2 or greater. Lower values speed up the reading of the touchscreen.
 
 \section{Debugging or production use}
 If you need to debug the functions, set the compiler optimization to \lstinline|-O0| (no optimization) or \lstinline|-Og| (optimize for debug). If you want to exhibit full speed support set the optimization to \lstinline|-Ofast|. If you need the smallest ROM footprint and have some speed, set the optimization to \lstinline|-Os|.
@@ -851,15 +954,14 @@ The VMA412 uses 13 pins to do its job. Nearly all of the Arduino compatible pins
 Some todo's left:
 
 \begin{itemize}
-\item Quarter circle plot function, with fill option, will be faster than flood fill circles;
+\item Quarter circle with fill plot function, will be faster than flood fill circles;
 \item Rectangle with rounded corners to support buttons to be pressed;
 \item Regular polygon plot function, with angle;
 \item Exchange top/bottom and left/right;
-\item Handling of \lstinline|\t| in console based printing
-\item Fix use of ADC3
-\item Make C++ wrappers
-\item Plot 256-color bitmaps
-\item Put characters in RAM so new characters can be defined, overwriting older ones
+\item Fix use of ADC3 for STM32F446;
+\item Make C++ wrappers;
+\item Put characters in RAM so new characters can be defined, overwriting older ones;
+\item High-level touchscreen X and Y read functions (needs rotation information).
 \end{itemize}
 
 

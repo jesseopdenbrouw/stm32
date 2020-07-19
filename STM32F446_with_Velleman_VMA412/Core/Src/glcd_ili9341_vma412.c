@@ -7,8 +7,8 @@
 
 Software License Agreement (BSD License)
 
-Version: 0.2
-Date: 2020/07/17
+Version: 0.1rc1
+Date: 2020/07/19
 
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
@@ -38,12 +38,10 @@ POSSIBILITY OF SUCH DAMAGE.
 
  */
 
-
-#if !defined(STM32F446xx) && !defined(STM32F411xx)
-#warning !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-#warning ! Only tested with STM32F446 Nucleo Board !
-#warning ! Only tested with STM32F411 Nucleo Board !
-#warning !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+/* to get rid of const warnings */
+#ifdef __GNUC__
+#pragma GCC diagnostic push  // require GCC 4.6
+#pragma GCC diagnostic ignored "-Wdiscarded-qualifiers"
 #endif
 
 #include <stdlib.h>
@@ -110,7 +108,7 @@ static glcd_buffer_t glcd_data[3*GLCD_WIDTH+1];
 static uint16_t glcd_width = GLCD_WIDTH;
 static uint16_t glcd_height = GLCD_HEIGHT;
 
-/* Standard 5x7 (6x8) font from AdaFruit */
+/* Standard 5x8 font from AdaFruit */
 #ifdef GLCD_CHARCTERS_IN_RAM
 #else
 const
@@ -1183,6 +1181,23 @@ void glcd_plotstring(uint16_t x, uint16_t y, char str[], glcd_color_t color, glc
 	}
 }
 
+/* Function glcd_plotrect
+ * Plots a rectangle
+ * @public
+ * @in: x  -- the x coordinate
+ * @in: y  -- the y coordinate
+ * @in: w  -- width
+ * @in: h  -- height
+ * @in: color -- the RGB color specification
+ * @out: void
+ */
+void glcd_plotrect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, glcd_color_t color) {
+	glcd_plothorizontalline(x, y, w, color);
+	glcd_plothorizontalline(x, y + h - 1, w, color);
+	glcd_plotverticalline(x, y, h, color);
+	glcd_plotverticalline(x + w - 1, y, h, color);
+}
+
 /* Function glcd_plotrectfill
  * Plots a filled rectangle
  * @public
@@ -1201,25 +1216,51 @@ void glcd_plotrectfill(uint16_t x, uint16_t y, uint16_t w, uint16_t h, glcd_colo
 	}
 }
 
-/* Function glcd_plotrect
- * Plots a rectangle
+/* Function glcd_plotrectrounded
+ * Based on the AdaFruit library
+ * Plots a rectangle with rounded corners
  * @public
  * @in: x  -- the x coordinate
  * @in: y  -- the y coordinate
  * @in: w  -- width
  * @in: h  -- height
+ * @in: r  -- the radius
  * @in: color -- the RGB color specification
  * @out: void
  */
-void glcd_plotrect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, glcd_color_t color) {
-	glcd_plothorizontalline(x, y, w, color);
-	glcd_plothorizontalline(x, y + h - 1, w, color);
-	glcd_plotverticalline(x, y, h, color);
-	glcd_plotverticalline(x + w - 1, y, h, color);
+void glcd_plotrectrounded(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t r, glcd_color_t color) {
+
+    uint16_t max_radius = ((w < h) ? w : h) / 2; // 1/2 minor axis
+
+    if (r > max_radius) {
+        r = max_radius;
+    }
+
+    glcd_plothorizontalline(x + r, y, w - 2 * r, color);         // Top
+    glcd_plothorizontalline(x + r, y + h - 1, w - 2 * r, color); // Bottom
+    glcd_plotverticalline(x, y + r, h - 2 * r, color);           // Left
+    glcd_plotverticalline(x + w - 1, y + r, h - 2 * r, color);   // Right
+
+    glcd_plotcirclequarter(x + r, y + r, r, GLCD_CORNER_UPPER_LEFT, color);
+    glcd_plotcirclequarter(x + w - r - 1, y + r, r, GLCD_CORNER_UPPER_RIGHT, color);
+    glcd_plotcirclequarter(x + w - r - 1, y + h - r - 1, r, GLCD_CORNER_LOWER_RIGHT, color);
+    glcd_plotcirclequarter(x + r, y + h - r - 1, r, GLCD_CORNER_LOWER_LEFT, color);
 }
 
+void glcd_plotrectroundedfill(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t r, glcd_color_t color) {
+
+	int16_t max_radius = ((w < h) ? w : h) / 2; // 1/2 minor axis
+    if (r > max_radius)
+      r = max_radius;
+    // smarter version
+    glcd_plotrectfill(x + r, y, w - 2 * r, h, color);
+    // draw four corners
+    glcd_plotcirclehalffill(x + w - r - 1, y + r, r, 1, h - 2 * r - 1, color);
+    glcd_plotcirclehalffill(x + r, y + r, r, 2, h - 2 * r - 1, color);
+}
 
 /* Adapted from the AdaFruit library */
+/* Using Bresenham's function */
 /* Function glcd_plotcircle
  * Plots a circle on the GLCD, with checks
  * @public
@@ -1263,6 +1304,128 @@ void glcd_plotcircle(uint16_t x0, uint16_t y0, uint16_t r, glcd_color_t color) {
 }
 
 /* Adapted from the AdaFruit library */
+/* Using Bresenham's function */
+/* Function glcd_plotcirclefill
+ * Plots a filled circle on the display
+ * @public
+ * @in: x0  -- center x
+ * @in: y0  -- center y
+ * @in: r   -- the radius
+ * @in: color -- the RGB color specification
+ * @out: void
+ */
+void glcd_plotcirclefill(uint16_t x0, uint16_t y0, uint16_t r, glcd_color_t color) {
+
+	glcd_plotverticalline(x0, y0 - r, 2 * r + 1, color);
+	glcd_plotcirclehalffill(x0, y0, r, GLCD_CORNER_BOTH, 0, color);
+}
+
+/* Adapted from the AdaFruit library */
+/* Using Bresenham's function */
+/* Function glcd_plotcirclequarter
+ * Note: doesn't plot the start and end coordinates
+ * Plots a quarter of a circle on the GLCD
+ * @public
+ * @in: x0  -- center x
+ * @in: y0  -- center y
+ * @in: r   -- the radius
+ * @in: cornername -- the quarter to plot, may be more than one
+ * @in: color -- the RGB color specification
+ * @out: void
+ */
+void glcd_plotcirclequarter(uint16_t x0, uint16_t y0, uint16_t r, glcd_corner_t cornername, glcd_color_t color) {
+
+	register int16_t f = 1 - r;
+
+	register int16_t ddF_x = 1;
+	register int16_t ddF_y = -2 * r;
+	register int16_t x = 0;
+	register int16_t y = r;
+
+	while (x < y) {
+		if (f >= 0) {
+			y--;
+			ddF_y += 2;
+			f += ddF_y;
+	    }
+	    x++;
+	    ddF_x += 2;
+	    f += ddF_x;
+	    if (cornername & GLCD_CORNER_LOWER_RIGHT) {
+	        glcd_plotpixel(x0 + x, y0 + y, color);
+	        glcd_plotpixel(x0 + y, y0 + x, color);
+	    }
+	    if (cornername & GLCD_CORNER_UPPER_RIGHT) {
+	    	  glcd_plotpixel(x0 + x, y0 - y, color);
+	    	  glcd_plotpixel(x0 + y, y0 - x, color);
+	    }
+	    if (cornername & GLCD_CORNER_LOWER_LEFT) {
+	    	  glcd_plotpixel(x0 - y, y0 + x, color);
+	    	  glcd_plotpixel(x0 - x, y0 + y, color);
+	    }
+	    if (cornername & GLCD_CORNER_UPPER_LEFT) {
+	    	  glcd_plotpixel(x0 - y, y0 - x, color);
+	    	  glcd_plotpixel(x0 - x, y0 - y, color);
+	    }
+	  }
+}
+
+/* Adapted from the AdaFruit library */
+/* Using Bresenham's function */
+/* Function glcd_plotcirclehalffill
+ * Note: doesn't plot the start and end coordinates
+ * Plots a quarter of a circle on the GLCD
+ * @public
+ * @in: x0  -- center x
+ * @in: y0  -- center y
+ * @in: r   -- the radius
+ * @in: corner -- the left, right of both halves of the circle
+ * @in: delta -- the squeeze factor, positive squeezes left/right, negative squeezes top/bottom, 0 for plain circle
+ * @in: color -- the RGB color specification
+ * @out: void
+ */
+void glcd_plotcirclehalffill(uint16_t x0, uint16_t y0, uint16_t r, glcd_cornerhalves_t corners, int16_t delta, glcd_color_t color) {
+
+  int16_t f = 1 - r;
+  int16_t ddF_x = 1;
+  int16_t ddF_y = -2 * r;
+  int16_t x = 0;
+  int16_t y = r;
+  int16_t px = x;
+  int16_t py = y;
+
+  delta++; // Avoid some +1's in the loop
+
+  while (x < y) {
+    if (f >= 0) {
+      y--;
+      ddF_y += 2;
+      f += ddF_y;
+    }
+    x++;
+    ddF_x += 2;
+    f += ddF_x;
+    // These checks avoid double-drawing certain lines, important
+    // for the SSD1306 library which has an INVERT drawing mode.
+    if (x < (y + 1)) {
+      if (corners & 1)
+        glcd_plotverticalline(x0 + x, y0 - y, 2 * y + delta, color);
+      if (corners & 2)
+          glcd_plotverticalline(x0 - x, y0 - y, 2 * y + delta, color);
+    }
+    if (y != py) {
+      if (corners & 1)
+          glcd_plotverticalline(x0 + py, y0 - px, 2 * px + delta, color);
+      if (corners & 2)
+          glcd_plotverticalline(x0 - py, y0 - px, 2 * px + delta, color);
+      py = y;
+    }
+    px = x;
+  }
+}
+
+/* Adapted from the AdaFruit library */
+/* Using Bresenham's function */
 /* Function glcd_plotline
  * Plots a line on the GLCD
  * @public
@@ -1373,6 +1536,59 @@ void glcd_plotbitmap(uint16_t x, uint16_t y, const uint8_t bitmap[], uint16_t w,
 			glcd_data[i*3] = (byte & 0x80) ? red : bred;
 			glcd_data[i*3+1] = (byte & 0x80) ? green : bgreen;
 			glcd_data[i*3+2] = (byte & 0x80) ? blue : bblue;
+		}
+		/* Write one row of data */
+		glcd_write(0x2c, 3*w, glcd_data);
+	}
+}
+
+/* Based on the AdaFruit library */
+/* Function glcd_plotbitmap8bpp
+ * Plots a 256-color indexed bitmap to the GLCD
+ * @public
+ * @in: x  -- the start x coordinate
+ * @in: y  -- the start y coordinate
+ * @in: w  -- width of the picture
+ * @in: h  -- height of the picture
+ * @in: pic -- start of the picture
+ * @in: palette -- start of the 256-color palette
+ * @out: void
+ */
+void glcd_plotbitmap8bpp(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint8_t *pic, const uint8_t *palette ) {
+
+	register uint16_t xx, yy;
+
+	/* If palette isn't specified, get the start of the picture
+	 * and set the start of the pixels after the palette
+	 */
+	if (palette == NULL) {
+		/* Palette at the start */
+		palette = pic;
+		/* Pixels start after the palette */
+		pic += 256*4;
+	}
+
+	for(yy=0; yy<h; yy++, y++) {
+		// 0x2A, x position
+		glcd_data[0] = x>>8;
+		glcd_data[1] = x&0xff;
+		glcd_data[2] = ((glcd_width-1)>>8)&0xff; //0x01;
+		glcd_data[3] = (glcd_width-1)&0xff; //0x3f;
+		glcd_write(0x2a, 4, glcd_data);
+
+		//0x2B, y position
+		glcd_data[0] = y>>8;
+		glcd_data[1] = y&0xff;
+		glcd_data[2] = ((glcd_height-1)>>8)&0xff; //0x00;
+		glcd_data[3] = (glcd_height-1)&0xff; //0xef;
+		glcd_write(0x2b, 4, glcd_data);
+
+		for(xx=0; xx<w; xx++) {
+			glcd_data[3*xx+0] = (palette[*pic*4+2]);
+			glcd_data[3*xx+1] = (palette[*pic*4+1]);
+			glcd_data[3*xx+2] = (palette[*pic*4+0]);
+			/* Skip over chroma, alpha or whatever */
+			pic++;
 		}
 		/* Write one row of data */
 		glcd_write(0x2c, 3*w, glcd_data);
@@ -1599,17 +1815,18 @@ void glcd_scrollvertical(uint16_t rows) {
 }
 
 /* Function glcd_putchar
- * Prints a character on the terminal
+ * Prints a character on the display (console based)
  * @public
  * @in: c  -- character to print
  * @out: void
- * TODO: handling of tabs
  */
 void glcd_putchar(char c) {
 	static uint16_t xc = 0;
 	static uint16_t yc = 0;
 	/* For now, leave skip at 10 */
     static uint16_t skip=10;
+    /* Tab stops at interval of ... */
+    static uint16_t tabstop=8;
 
 	/* Formfeed clears the screen */
     if (c=='\f') {
@@ -1637,8 +1854,26 @@ void glcd_putchar(char c) {
 			yc=yc+skip;
 		}
 	} else if (c=='\t') {
-		/* Handle tabs for 4 spaces */
+		/* Handle tabs for <tabstop> positions */
+		uint16_t tabs = tabstop-(xc/6)%tabstop;
 
+		for (uint16_t i=0; i<tabs; i++) {
+			/* Wrap is needed */
+			if (xc>=glcd_width-(glcd_width%6)) {
+				xc=0;
+				if (yc>=glcd_height-skip) {
+					glcd_scrollvertical(skip);
+					glcd_plotrectfill(0, glcd_height-skip, glcd_width, skip, GLCD_COLOR_BLACK);
+				} else {
+					yc=yc+skip;
+				}
+			}
+			glcd_plotchar(xc, yc, ' ', GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK);
+			xc += 5;
+			/* Plot a <color> line of 8 pixels, the height of a character */
+			glcd_plotverticalline(xc, yc, 8, GLCD_COLOR_BLACK);
+			xc++;
+		}
 	} else {
 		/* Wrap is needed */
 		if (xc>=glcd_width-(glcd_width%6)) {
@@ -1659,7 +1894,7 @@ void glcd_putchar(char c) {
 }
 
  /* Function glcd_puts
-  * Software based console printing (slow!)
+  * Software based console printing (migth be slow)
   * @public
   * @in: str  -- string to be printed
   * @out: void
@@ -1667,8 +1902,18 @@ void glcd_putchar(char c) {
 void glcd_puts(char str[]) {
 	register uint32_t i;
 
-	for (i=0; str[i] != '\0'; i++) {
-		glcd_putchar(str[i]);
+	/* Really? You provided NULL? Gosh!!! */
+	if (str == NULL) {
+		glcd_putchar('(');
+		glcd_putchar('n');
+		glcd_putchar('u');
+		glcd_putchar('l');
+		glcd_putchar('l');
+		glcd_putchar(')');
+	} else {
+		for (i=0; str[i] != '\0'; i++) {
+			glcd_putchar(str[i]);
+		}
 	}
 }
 
