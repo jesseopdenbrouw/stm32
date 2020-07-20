@@ -44,8 +44,9 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <stdio.h>
 #include <string.h>
 #include <limits.h>
+#include <stdint.h>
 
-#include <touchscreen_vma412.h>
+#include "touchscreen_vma412.h"
 
 /* GPIO A(1), B(2), C(4) USED */
 /* Really should be done by a function that reads the used ports */
@@ -155,23 +156,31 @@ uint32_t touchscreen_init(ADC_TypeDef *used_ADC) {
 	RCC->AHB1ENR |= TOUCH_GPIO_USED;
 
 	/* Enable ADCx clock */
+#ifdef ADC1
 	if (pADC == ADC1) {
 		RCC->APB2ENR |= (1<<RCC_APB2ENR_ADC1EN_Pos);
+#endif
+#ifdef ADC2
 	} else if (pADC == ADC2) {
 		RCC->APB2ENR |= (1<<RCC_APB2ENR_ADC2EN_Pos);
-// ADC3 doesn't seem to work, TODO
-//	} else if (pADC == ADC3) {
-//		RCC->APB2ENR |= (1<<RCC_APB2ENR_ADC3EN_Pos);
+#endif
+#ifdef ADC3
+    //ADC3 doesn't seem to work, TODO
+	} else if (pADC == ADC3) {
+		RCC->APB2ENR |= (1<<RCC_APB2ENR_ADC3EN_Pos);
 	} else {
+#endif
 		/* Unknown ADC */
 		return 0;
+#ifdef ADC
 	}
+#endif
 
-	/* ADC Clock, 168 / 30 = 5.6 --> prescaler = 8, for all ADCs */
-	/* The ADC doesn't have to be that fast for the touchscreen functions */
+	/* ADC Clock, freq / 30 = 5.6 --> prescaler = 8, for all ADCs */
+	/* The ADC doesn't have to be that fast for the touchscreen functions, but maybe for other functions */
 	ADC->CCR = (3 << ADC_CCR_ADCPRE_Pos);
 
-	/* ADC1 active */
+	/* ADCx active */
 	pADC->CR2 = (1<<ADC_CR2_ADON_Pos);
 
 	/* Wait for the ADCx to start up (3 us) */
@@ -196,6 +205,20 @@ uint32_t touchscreen_init(ADC_TypeDef *used_ADC) {
 	pADC->SQR1 = (0<<ADC_SQR1_L_Pos);
 
 	return 1;
+}
+
+/* Set the ADC speed after it is initialized */
+/* Function touchscreen_setadcspeed
+ * Sets the ADC speed for all ADCs
+ * @public
+ * @in: speed -- the speed
+ * @out: void
+ */
+void touchscreen_setadcspeed(uint32_t speed) {
+	speed &= 0x3;
+
+	ADC->CCR &= ~(3 << ADC_CCR_ADCPRE_Pos);
+	ADC->CCR |= (speed << ADC_CCR_ADCPRE_Pos);
 }
 
 /* Function touchscreen_readrawx
