@@ -47,9 +47,10 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #include <stdio.h>
 #include <math.h>
+#include <stdint.h>
 
-#include <glcd_ili9341_vma412.h>
-#include <touchscreen_vma412.h>
+#include "glcd_ili9341_vma412.h"
+#include "touchscreen_vma412.h"
 
 #include "main.h"
 
@@ -203,7 +204,7 @@ int main(void) {
 
 	/* Initialize the touchscreen system */
 	/* Select one of ADC1 and ADC2 */
-	touchscreen_init(ADC2);
+	touchscreen_init(ADC1);
 
 	/* At this point, the touchscreen is ready */
 
