@@ -46,6 +46,8 @@ extern "C"
 {
 #endif
 
+#include <stdint.h>
+
 /* Driver version */
 #define GLCD_VERSION "STM32 VMA412 GLCD Driver v 0.1rc1 (Jul 19 2020)"
 
@@ -61,17 +63,19 @@ extern "C"
 /* Character table in ROM or RAM */
 /* Note: although you can set the character table to RAM, it
  * still occupies ROM. The character table is then copied
- * from ROM to RAM
+ * from ROM to RAM, when the STM32 is started.
  */
-#define GLCD_CHARCTERS_IN_RAM
+//#define GLCD_CHARCTERS_IN_RAM
+/* Define this to make use of the buildin THUAS bitmaps */
+#define GLCD_HAVE_THUAS_BITMAPS
 
-/* Width and the height in pixels, landscape */
+/* Display idth and the height in pixels, landscape, do not change */
 #define GLCD_WIDTH (320)
 #define GLCD_HEIGHT (240)
 
 #include <stdint.h>
 
-/* Color is defined as 32 bit */
+/* Color is defined as unsigned 32 bit. DO NOT CHANGE */
 typedef uint32_t glcd_color_t;
 
 /* Buffer for actions is one of uint8_t or uint16_t */
@@ -106,7 +110,6 @@ typedef enum {GLCD_CORNER_UPPER_LEFT=1, GLCD_CORNER_UPPER_RIGHT=2, GLCD_CORNER_L
 
 /* To draw left, right of both corner halves */
 typedef enum {GLCD_CORNER_LEFT_HALF=1, GLCD_CORNER_RIGHT_HALF=2, GLCD_CORNER_BOTH=3} glcd_cornerhalves_t;
-
 
 /* For low level commands */
 /* How to use the CS pin */
