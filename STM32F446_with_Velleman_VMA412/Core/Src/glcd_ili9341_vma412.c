@@ -46,8 +46,10 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #include <stdlib.h>
 #include <math.h>
+#include <stdint.h>
+
 #include "main.h"
-#include <glcd_ili9341_vma412.h>
+#include "glcd_ili9341_vma412.h"
 
 /* Special to signal a delay in ms */
 /* Take any 8 bit value that is NOT assigned to a register address */
@@ -259,6 +261,7 @@ static const glcd_buffer_t ILI9341_regValues_stm32[] = {  // from MCUFRIEND_kbv,
 	0x00, 0,
 };
 
+#ifdef GLCD_HAVE_THUAS_BITMAPS
 /* Bitmap of the THUAS logo 320x96, inverted */
 /* Created from: https://littlevgl.com/image-to-c-array */
 #ifdef __GNUC__
@@ -422,16 +425,17 @@ static const uint8_t glcd_hhs_small_map[] = {
 	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 };
-
+#endif
 
 /* Variable prems -- prescaler ms
  *          preus -- prescaler us
- *          100ns -- #loops for 100 ns
+ *          writedelay -- #loops for writes
+ *          readdelay -- #loops for reads
  * @private
  */
 static uint32_t prems;
 static uint32_t preus;
-static uint32_t ns100;
+static uint32_t writedelay;
 static uint32_t readdelay;
 
 
@@ -449,13 +453,13 @@ static void glcd_delay_init(void) {
 	SystemCoreClockUpdate();
 	prems = SystemCoreClock/3000UL+1UL;     /* factor for ms delay */
 	preus = SystemCoreClock/3000000UL+1UL;  /* factor for us delay */
-	ns100 = SystemCoreClock/30000000UL+1UL; /* factor for 66 ns write delay */
-	readdelay = ns100*7;                    /* factor for 450 ns read write */
+	writedelay = 66UL*(SystemCoreClock/1000UL)/3000000UL+1UL;  /* factor for 66 ns write delay */
+	readdelay = 450UL*(SystemCoreClock/1000UL)/3000000UL+1UL;  /* factor for 450 ns read delay */
 }
 
 /* Function glcd_delay_ms
  * Creates a delay for the GLCD functions
- * @private
+ * @public
  * @in: delay --> delay in millisecs
  * @out: void
  */
@@ -495,8 +499,8 @@ static void glcd_delay_us(uint32_t delay) {
 				 );
 }
 
-/* Function glcd_delay_halfus
- * Creates a 100 ns delay for the GLCD write functions
+/* Function glcd_delay_write
+ * Creates a delay for the GLCD write functions
  * Tweakable
  * @private
  * @in: none
@@ -504,7 +508,7 @@ static void glcd_delay_us(uint32_t delay) {
  */
 static void glcd_delay_write(void) {
 
-	uint32_t ns = ns100;
+	uint32_t ns = writedelay;
 
 	asm volatile ("mov r3, %[ns] \n\t"
 				  ".Lglcdhu%=: \n\t"
@@ -544,7 +548,7 @@ static void glcd_delay_read(void) {
  * @out: void
  */
 void glcd_set_write_pulse_delay(uint32_t delay) {
-	ns100 = delay;
+	writedelay = delay;
 }
 
 /* Function glcd_set_read_pulse_delay
@@ -588,7 +592,7 @@ static void glcd_hardware_reset(void) {
  * @in: none
  * @out: void
  */
-static void glcd_init_pins(void) {
+static void glcd_hardware_init(void) {
 
 	/* Enable IO port A, B, C Clocks */
 	/* Should be done by a routine thats reads the GPIOs
@@ -883,7 +887,7 @@ void glcd_init(void) {
 	/* Hard reset the GLCD */
 	glcd_hardware_reset();
 	/* Initialize control pins, not the data pins, because they can be used for input or output */
-	glcd_init_pins();
+	glcd_hardware_init();
 
 	/* Setup the GLCD */
 	i=0;
@@ -910,11 +914,11 @@ void glcd_init(void) {
  * @out: void
  */void glcd_setrotation(glcd_rotation_t rot) {
 	switch (rot) {
-	case GLCD_SCREEN_ROT0: glcd_data[0] = 0xe8; glcd_width = GLCD_WIDTH; glcd_height = GLCD_HEIGHT; break;
 	case GLCD_SCREEN_ROT90: glcd_data[0] = 0x88; glcd_width = GLCD_HEIGHT; glcd_height = GLCD_WIDTH; break;
 	case GLCD_SCREEN_ROT180: glcd_data[0] = 0x28; glcd_width = GLCD_WIDTH; glcd_height = GLCD_HEIGHT; break;
 	case GLCD_SCREEN_ROT270: glcd_data[0] = 0x48; glcd_width = GLCD_HEIGHT; glcd_height = GLCD_WIDTH; break;
-	default: glcd_data[0] = 0xe8; break;
+	case GLCD_SCREEN_ROT0:
+	default: glcd_data[0] = 0xe8; glcd_width = GLCD_WIDTH; glcd_height = GLCD_HEIGHT; break;
 	}
 	glcd_write(0x36, 1, glcd_data);
 }
@@ -1502,13 +1506,20 @@ void glcd_plotbitmap(uint16_t x, uint16_t y, const uint8_t bitmap[], uint16_t w,
 	register uint8_t bgreen = (bg>>8)&0xff;
 	register uint8_t bblue = (bg>>0)&0xff;
 
-	/* Special treatment for embedded bitmap */
+#ifdef GLCD_HAVE_THUAS_BITMAPS
+	/* Special treatment for embedded bitmaps */
 	if (bitmap == GLCD_THUAS_DEFAULT_BITMAP) {
 		bitmap = glcd_hhs_map;
 	}
 	if (bitmap == GLCD_THUAS_DEFAULT_BITMAP_SMALL) {
 		bitmap = glcd_hhs_small_map;
 	}
+#else
+	/* Handle NULL pointer */
+	if (bitmap == NULL) {
+		return;
+	}
+#endif
 
 	for (uint16_t j = 0; j < h; j++, y++) {
 		// 0x2A, x position
@@ -1976,7 +1987,7 @@ inline uint16_t glcd_getheight(void) {
 /* Function glcd_convertcolor
  * Converts a 16 bit color to 24 bit color (18 bits used)
  * @public
- * @in: color16 --> the 16 bit color specification
+ * @in: color16 --> the 16 bit color specification in 5/6/5 notation
  * @out: the 24-bit color
  */
 glcd_color_t glcd_convertcolor(uint16_t color16) {
