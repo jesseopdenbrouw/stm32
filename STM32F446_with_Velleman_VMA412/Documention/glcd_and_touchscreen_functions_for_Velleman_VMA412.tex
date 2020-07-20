@@ -1,7 +1,7 @@
 
 %%% glcd_and_touchscreen_functions_for_velleman_VMA412.tex
 %%%
-%%%   Documentation for version 0.3
+%%%   Documentation for version 0.1rc1
 %%%
 %%%
 %%% Copyright 2020 J.E.J. op den BRouw
@@ -22,14 +22,24 @@
 \documentclass[12pt]{article}
 
 \usepackage{parskip}
-\usepackage{listings}
 \usepackage[charter]{mathdesign}
 \usepackage{nimbusmono}
-\usepackage{hyperref}
 \usepackage[margin=1in]{geometry}
 \usepackage{graphicx}
 %\usepackage{tocloft}
 %\setlength\cftsubsecnumwidth{3.5em}
+%% Indexing words...
+\usepackage[noautomatic]{imakeidx}
+%% The index page is typeset...
+\indexsetup{othercode=\footnotesize}
+\makeindex[columns=2]
+%\usepackage{showidx}
+\newcommand{\ifunc}[1]{\index{\texttt{#1}}}
+
+
+\usepackage{listings}
+
+\usepackage{hyperref}
 
 \lstset{
     language=C,
@@ -37,12 +47,14 @@
     xleftmargin=1em
 }
 
+
 \author{Version 0.1rc1\\[2ex]Jesse op den Brouw\thanks{Please mail me at: \href{mailto:J.E.J.opdenBrouw@hhs.nl}{J.E.J.opdenBrouw@hhs.nl}}\\The Hague University of Applied Sciences\\(THUAS)}
 \title{Graphic LCD and Touchscreen Functions for Velleman VMA412 with ILI9341 Controller used with a STM32F446 Nucleo Board}
 \date{\today}
 
 
 \begin{document}
+
 \raggedbottom
 \maketitle
 
@@ -169,20 +181,22 @@ If you have set up your project just start compilation using \texttt{Project}$\r
 
 
 \section{Color system}
+\index{Color system}
 The GLCD is set up to use the 18-bit color specification. This means that colors are specified with unsigned 32 bits. The specification is as follows:
 
-Bits 31-24: should be kept at 0.\\
+Bits 31-24: ignored, should be kept at 0.\\
 Bits 23-16: red -- only upper 6 bits are used\\
 Bits 15-8: green -- only upper 6 bits are used\\
 Bits 7-0: blue -- only upper 6 bits are used
 
-\textbf{Note:} The 16 bit color specification in \textbf{NOT} supported, but they can be converted. See \S~\ref{sec:convertcolors}.
+Note: The 16 bit color specification in \textbf{NOT} supported, but they can be converted. See $\S$~\ref{sec:convertcolors}.
 
 Please note that although 8 bits per color can be specified, only the upper 6 bits of each color are used, since the display uses 18 bits of color infomation. The lower 2 bits of each color are ignored. This means that color \lstinline|0x000000| and \lstinline|0x000001| are displayed the same, but are different in compares.
 
-The color is specified using the the type \lstinline|glcd_color_t|.
+The color is specified using the the type \lstinline|glcd_color_t|. Note: don't ever change the type \lstinline|glcd_color_t|.
 
 \subsection{Predefined colors}
+\index{Predefined colors}
 There are some predefines colors:
 
 \begin{lstlisting}
@@ -214,9 +228,11 @@ Note: don't ever change the type \lstinline|glcd_color_t|.
 
 
 \section{X and Y coordinates, display orientation}
+\index{Coordinate system}\index{Display orientation}
 The X and Y coordinates use type \lstinline|uint16_t| for their values. The display is set up in landscape where \lstinline|X| is between 0 and 319 and \lstinline|y| is between 0 and 239. Point (0,0) is in the upper left corner,
 point (239,319) is in the lower right corner. The landscape orientation is with the SD-card socket to the right.
 The display orientation can be changed, see $\S$~\ref{sec:rotdispl}.
+
 
 \section{Graphic LCD}
 \subsection{GLCD Initialization}
@@ -237,6 +253,7 @@ void glcd_init(void);
 \subsection{Very low GLCD functions}
 
 \subsubsection{Setting the write delay}
+\ifunc{glcd\_set\_write\_pulse\_delay}
 \textbf{Note:} use with care.\\
 Sets the delay for write actions. There is no need to call this function as the correct timing is calculated according to the system clock speed after the clock system is set up, but you can tweak this value to get maximum performance. \lstinline|delay| must be greater than 0. The function prototype is:
 \begin{lstlisting}
@@ -244,17 +261,20 @@ void glcd_set_write_pulse_delay(uint32_t delay);
 \end{lstlisting}
 
 \subsubsection{Setting the read delay}
+\ifunc{glcd\_set\_read\_pulse\_delay}
 \textbf{Note:} use with care.\\
 Sets the delay for read actions. There is no need to call this function as the correct timing is calculated according to the system clock speed after the clock system is set up, but you can tweak this value to get maximum performance. \lstinline|delay| must be greater than 0. The function prototype is:
 
 \begin{lstlisting}
-glcd_set_set_read_pulse_delay(uint32_t delay);
+void glcd_set_read_pulse_delay(uint32_t delay);
 \end{lstlisting}
 
 \subsection{GLCD low level functions}
+\ifunc{glcd\_read\_terminate}
 There are a number of low level functions. They are normally not needed.
 
 \subsubsection{Reading data from the display}
+
 Te read data from the display, use the function \lstinline|glcd_read_terminate|. Reading is explicitly terminated. The function prototype is:
 
 \begin{lstlisting}
@@ -263,7 +283,10 @@ void glcd_read_terminate(uint16_t cmd,            // The command
                          glcd_buffer_t data[]);   // The buffer
 \end{lstlisting}
 
+Note: is you read pixel color information (scan line), the first \lstinline|uint16_t| of the buffer is useless information.
+
 \subsubsection{Writing data to the display}
+\ifunc{glcd\_write}
 Writes data to the display, no explicit terminate. This means that multiple writes can be done in sequence.
 \begin{lstlisting}
 void glcd_write(uint16_t cmd,                     // The command
@@ -272,13 +295,14 @@ void glcd_write(uint16_t cmd,                     // The command
 \end{lstlisting}
 
 \subsubsection{Explicit terminating a write}
-
+\ifunc{glcd\_terminate\_write}
 Terminates a write:
 \begin{lstlisting}
 void gcld_terminate_write(void);
 \end{lstlisting}
 
 \subsubsection{Changing the buffer type}
+\index{Changing buffer type}
 \label{sec:changebuf}
 The low level functions use an internal buffer. The buffer is of type \lstinline|glcd_buffer_t|. This normally set to an unsigned 16-bit size. This size can be changed:
 
@@ -289,13 +313,15 @@ Set to \lstinline|uint32_t| for maximum capacity (not recommended)
 \subsection{GLCD high level commands}
 
 \subsubsection{Delay}
-
+\ifunc{glcd\_delay\_ms}
 To delay your applications (in milliseconds), use :
+
 \begin{lstlisting}
 void glcd_delay_ms(uint32_t delay);
 \end{lstlisting}
 
 \subsubsection{Rotating the display}
+\ifunc{glcd\_setrotation}
 \label{sec:rotdispl}
 
 To set the rotation of the display, use:
@@ -323,12 +349,15 @@ To be compatible with Arduino-based software, set the rotation to 90$^\circ$.
 Note: the touchscreen is \textbf{not} rotated. The touchscreen functions are setup for the standard rotation of 0$^\circ$. How to handle the touchscreen in case of rotated displays, see $\S$~\ref{sec:rottouch}.
 
 \subsubsection{Clear the display}
+\ifunc{glcd\_cls}
+
 To clear the display with a color, use:
 \begin{lstlisting}
 void glcd_cls(glcd_color_t color);
 \end{lstlisting}
 
 \subsubsection{Plot a pixel}
+\ifunc{glcd\_plotpixel}
 To plot a pixel, use:
 \begin{lstlisting}
 void glcd_plotpixel(uint16_t x,           // x coordinate
@@ -340,7 +369,8 @@ Note: if \lstinline|x| is greater that the width of the display minus 1, the pix
 Note: if \lstinline|y| is greater that the height of the display, minus 1, the pixel is not plotted.\\
 
 \subsubsection{Read a pixel}
-To read a pixel (getting color information) in 32-bit version, use:
+\ifunc{glcd\_readpixel}
+To read a pixel (getting color information) in \lstinline|glcd_color_t| use:
 
 \begin{lstlisting}
 glcd_color_t glcd_readpixel(uint16_t x,   // x coordinate
@@ -351,6 +381,7 @@ Note: if \lstinline|x| is greater that the width of the display minus 1, the ret
 Note: if \lstinline|y| is greater that the height of the display, minus 1, the returned color is undefined.\\
 
 \subsubsection{Plot a horizontal line}
+\ifunc{glcd\_plothorizontalline}
 To plot a horizontal line (fast), use:
 \begin{lstlisting}
 void glcd_plothorizontalline(uint16_t x,           // x coordinate
@@ -362,6 +393,7 @@ void glcd_plothorizontalline(uint16_t x,           // x coordinate
 Note: if \lstinline|x+w| is greater than the width of the display minus 1, the pixels in excess are not plotted.
 
 \subsubsection{Plot a vertical line}
+\ifunc{glcd\_plotverticalline}
 To plot a vertical line (fast), use:
 \begin{lstlisting}
 void glcd_plotverticalline(uint16_t x              // x coordinate
@@ -372,6 +404,7 @@ void glcd_plotverticalline(uint16_t x              // x coordinate
 Note: if \lstinline|y+h| is greater than the height of the display minus 1, the pixels in excess are not plotted.
 
 \subsubsection{Plot a line with any angle and length}
+\ifunc{glcd\_plotline}
 To plot a line with any angle and length, use:
 \begin{lstlisting}
 void glcd_plotline(uint16_t x0,            // x start point
@@ -381,9 +414,10 @@ void glcd_plotline(uint16_t x0,            // x start point
                    glcd_color_t color);    // color
 \end{lstlisting}
 
-Note: the part of the line that is exceeding the physical dimensions of the display are not plotted.
+Note: the part of the line that is exceeding the dimensions of the display are not plotted.
 
 \subsubsection{Plot a character using buildin font}
+\ifunc{glcd\_plotchar}
 To plot a character using the buildin font (5x8), use:
 \begin{lstlisting}
 void glcd_plotchar(uint16_t x,             // x coordinate
@@ -397,6 +431,7 @@ Note: character is one of 0 -- 255 (no special C treatment)\\
 Note: if \lstinline|color| is equal to \lstinline|bg| then pixels having background color are not printed!
 
 \subsubsection{Plot a string using buildin font}
+\ifunc{glcd\_plotstring}
 To plot a string using the buildin font, use:
 \begin{lstlisting}
 void glcd_plotstring(uint16_t x,                  // x coordinate
@@ -417,6 +452,7 @@ GLCD_STRING_WIDE       // two pixels apart
 \end{lstlisting}
 
 \subsubsection{Plot a rectangle}
+\ifunc{glcd\_plotrect}
 To plot a rectangle, use:
 \begin{lstlisting}
 void glcd_plotrect(uint16_t x,             // x coordinate
@@ -429,6 +465,7 @@ void glcd_plotrect(uint16_t x,             // x coordinate
 Note: \lstinline|x| and \lstinline|y| specify the upper left corner.
 
 \subsubsection{Plot a filled rectangle}
+\ifunc{glcd\_plotrectfill}
 To plot a filled rectangle, use:
 \begin{lstlisting}
 void glcd_plotrectfill(uint16_t x,            // x coordinate
@@ -441,6 +478,7 @@ void glcd_plotrectfill(uint16_t x,            // x coordinate
 Note: \lstinline|x| and \lstinline|y| specify the upper left corner.
 
 \subsubsection{Plot a rectangle with rounded corners}
+\ifunc{glcd\_plotrectrounded}
 To plot a rectangle with rounded corners, use:
 
 \begin{lstlisting}
@@ -455,6 +493,7 @@ void glcd_plotrectrounded(uint16_t x,           // x coordinate
 Note: \lstinline|x| and \lstinline|y| specify the upper left corner as plotted with \lstinline|glcd_plotrect|.
 
 \subsubsection{Plot a filled rectangle with rounded corners}
+\ifunc{glcd\_plotrectroundedfill}
 To plot a filled rectangle with rounded corners, use:
 
 \begin{lstlisting}
@@ -469,6 +508,7 @@ void glcd_plotrectroundedfill(uint16_t x,           // x coordinate
 Note: \lstinline|x| and \lstinline|y| specify the upper left corner as plotted with \lstinline|glcd_plotrect|.
 
 \subsubsection{Plot a circle}
+\ifunc{glcd\_plotcircle}
 To plot a circle, use:
 \begin{lstlisting}
 void glcd_plotcircle(uint16_t x0,             // center x coordinate
@@ -478,15 +518,17 @@ void glcd_plotcircle(uint16_t x0,             // center x coordinate
 \end{lstlisting}
 
 \subsubsection{Plot a filled circle}
+\ifunc{glcd\_plotcirclefill}
 To plot a filled circle, use:
 \begin{lstlisting}
-void glcd_plotcircle(uint16_t x0,             // center x coordinate
-                     uint16_t y0,             // center y coordinate
-                     uint16_t r,              // radius
-                     glcd_color_t color);     // color
+void glcd_plotcirclefill(uint16_t x0,             // center x coordinate
+                         uint16_t y0,             // center y coordinate
+                         uint16_t r,              // radius
+                         glcd_color_t color);     // color
 \end{lstlisting}
 
 \subsubsection{Plot quarters of a circle}
+\ifunc{glcd\_plotcirclequarter}
 To plot quarters of a circle, use:
 \begin{lstlisting}
 void glcd_plotcirclequarter(uint16_t x0,               -- center x
@@ -501,6 +543,7 @@ Note: \lstinline|cornername| is one of or a composition of:
 \lstinline|GLCD_CORNER_UPPER_LEFT|,\\ \lstinline|GLCD_CORNER_UPPER_RIGHT|, \lstinline|GLCD_CORNER_LOWER_RIGHT| and \lstinline|GLCD_CORNER_LOWER_LEFT|
 
 \subsubsection{Plot and fill left and/or right halves of a circle}
+\ifunc{glcd\_plotcirclehalffill}
 To plot and fill left and/or right halves of a circle, use:
 
 \begin{lstlisting}
@@ -518,6 +561,7 @@ Note: doesn't plot the outer top-to-bottom vertical line.
 
 
 \subsubsection{Plot an arc}
+\ifunc{glcd\_plotarc}
 To plot an arc, use:
 \begin{lstlisting}
 void glcd_plotarc(uint16_t xc,                // center x coordinate
@@ -532,6 +576,7 @@ Note: this function is only available if \lstinline|GLCD_USE_ARC| is defined.\\
 Note: this function uses \lstinline|sinf| and \lstinline|cosf| math functions, using the onboard FPU.
 
 \subsubsection{Plot a triangle}
+\ifunc{glcd\_plottriangle}
 To plot a triangle, use:
 
 \begin{lstlisting}
@@ -546,6 +591,7 @@ void glcd_plottriangle(uint16_t x1,          // start x
 
 
 \subsubsection{Plot a 2-color bitmap}
+\ifunc{glcd\_plotbitmap}
 To plot a 2-color bitmap, use:
 \begin{lstlisting}
 void glcd_plotbitmap(uint16_t x,              // x coordinate
@@ -564,6 +610,7 @@ Note: you will get compiler warnings if your bitmap is in RAM, because \lstinlin
 Note: if you need to convert your image to a 2-bit color bitmap, have a look at \url{https://lvgl.io/tools/imageconverter}.
 
 \subsubsection{Plot a 256-color indexed bitmap}
+\ifunc{glcd\_plotbitmap8bpp}
 To plot a 256-color indexed bitmap, use:
 \begin{lstlisting}
 void glcd_plotbitmap8bpp(uint16_t x,               // x start point
@@ -583,6 +630,7 @@ Note: you will get compiler warnings if your bitmap is in RAM, because \lstinlin
 Note: if you need to convert your image to a 256-color indexed image, have a look at \url{https://lvgl.io/tools/imageconverter}.
 
 \subsubsection{Display inversion}
+\ifunc{glcd\_inversion}
 Sets the display inversion (or not):
 \begin{lstlisting}
 void glcd_inversion(glcd_display_inversion_t what);
@@ -595,6 +643,7 @@ GLCD_DISPLAY_INVERSION_ON
 \end{lstlisting}
 
 \subsubsection{Display idle}
+\ifunc{glcd\_idle}
 Set the display to idle (or not):
 \begin{lstlisting}
 void glcd_idle(glcd_display_idle_t what);
@@ -608,6 +657,7 @@ GLCD_DISPLAY_IDLE_ON
 \end{lstlisting}
 
 \subsubsection{Display on or off}
+\ifunc{glcd\_display}
 Sets the display on or off:
 \begin{lstlisting}
 void glcd_display(glcd_display_t what);
@@ -621,6 +671,7 @@ GLCD_DISPLAY_ON
 \end{lstlisting}
 
 \subsubsection{Flood fill an object}
+\ifunc{glcd\_floodfill}
 Flood fill an object using a software stack based approach:
 \begin{lstlisting}
 void glcd_floodfill(uint16_t xs,                 // x start point
@@ -635,6 +686,7 @@ Note: if you have problems filling an object increase the value of \lstinline|GL
 Note: the stack uses unsigned 32-bit entries so the complete stack uses \lstinline|GLCD_STACK_SIZE|*4 bytes of RAM.
 
 \subsubsection{Scroll the display vertical upwards}
+\ifunc{glcd\_scrollvertical}
 To scroll the display vertical a number of lines, use:
 \begin{lstlisting}
 void glcd_scrollvertical(uint16_t lines);   // lines to scroll upwards
@@ -643,6 +695,7 @@ void glcd_scrollvertical(uint16_t lines);   // lines to scroll upwards
 Note: this is a software based scroll, could be slow. The lines are scrolled upwards off the display (no rotation), and the vacant lines are left untouched.
 
 \subsubsection{Console based character printing}
+\ifunc{glcd\_putchar}
 \label{sec:consolebasedcharacterprinting}
 To use a simple console based character printing, use:
 \begin{lstlisting}
@@ -659,6 +712,7 @@ Note: if a character ``falls off'' the display, line wrap will be used, may caus
 Note: this function is aware of the current display rotation.
 
 \subsubsection{Console based string printing}
+\ifunc{glcd\_puts}
 To use a simple console based string printing use:
 \begin{lstlisting}
 void glcd_puts(char str[]);
@@ -669,6 +723,7 @@ Note: see $\S$\ref{sec:consolebasedcharacterprinting} for character handling.\\
 Note: if \lstinline|str| equals \lstinline|NULL|, then \lstinline|(null)| is printed.
 
 \subsubsection{Get the current display width}
+\ifunc{glcd\_getwidth}
 To get the current display width, use:
 
 \begin{lstlisting}
@@ -676,12 +731,14 @@ uint16_t glcd_getwidth(void);
 \end{lstlisting}
 
 \subsubsection{Get the current display height}
+\ifunc{glcd\_getheight}
 To get the current display height, use:
 \begin{lstlisting}
 uint16_t glcd_getheight(void);
 \end{lstlisting}
 
 \subsubsection{Converting 16 bit colors}
+\ifunc{glcd\_convertcolor}
 \label{sec:convertcolors}
 To convert 16 bit standard colors to 24-bit colors, use:
 
@@ -693,6 +750,7 @@ Note: 16 bit colors are composed of 5 bit red (bits 11 -- 15), 6 bit green (bits
 Note: although the returned color is specified as a 24-bit value, only 65536 different colors can be composed using 16-bit colors.
 
 \subsection{GLCD Tayloring}
+\index{GLCD tayloring}
 There are a number of \lstinline|#define|'s that can be manipulated to taylor the GLCD functions to your needs. They can be found in \lstinline|glcd_ili9341_vma412.h|:
 
 \begin{lstlisting}
@@ -700,12 +758,14 @@ There are a number of \lstinline|#define|'s that can be manipulated to taylor th
 #define GLCD_STACK_SIZE (2000)
 #define GLCD_USE_FLOOD_FILL_PRINT_IF_STACK_OVERFLOW
 #define GLCD_USE_ARC
+#define GLCD_CHARCTERS_IN_RAM
+#define GLCD_HAVE_THUAS_BITMAPS
 
 #define GLCD_WIDTH (320)
 #define GLCD_HEIGHT (240)
 \end{lstlisting}
 
-Define \lstinline|GLCD_USE_FLOOD_FILL| if you need to (flood) fill objects, undefine to save ROM  and RAM resources. If you use flood fill, set the stack size \lstinline|GLCD_STACK_SIZE| to an appropriate size. While testing or debugging, define \lstinline|GLCD_USE_FLOOD_FILL_PRINT_IF_STACK_OVERFLOW|. This will print warning messages if there is a stack overflow when filling objects. Undefine if you are sure there will be no stack overflow. Define \lstinline|GLCD_USE_ARC| if you need to plot arcs, undefine to save ROM resources. Plotting arcs use the onboard FPU for sine and cosine calculations.
+Define \lstinline|GLCD_USE_FLOOD_FILL| if you need to (flood) fill objects, undefine to save ROM  and RAM resources. If you use flood fill, set the stack size \lstinline|GLCD_STACK_SIZE| to an appropriate size. While testing or debugging, define \lstinline|GLCD_USE_FLOOD_FILL_PRINT_IF_STACK_OVERFLOW|. This will print warning messages if there is a stack overflow when filling objects. Undefine if you are sure there will be no stack overflow. Define \lstinline|GLCD_USE_ARC| if you need to plot arcs, undefine to save ROM resources. Plotting arcs use the onboard FPU for sine and cosine calculations. Define \lstinline|GLCD_CHARACTERS_IN_RAM| to place the character table in RAM. This way you can change the view of a character by changing the bit patterns (but of course is uses extra RAM). Define \lstinline|GLCD_HAVE_THUAS_BITMAPS| if you need the buildin THUAS logos (you probably won't need them).
 
 Leave \lstinline|GLCD_WIDTH| and \lstinline|GLCD_HEIGHT| to their respective values.
 
@@ -717,7 +777,7 @@ The size of the buffer elements can be changed, see~\ref{sec:changebuf}.
 typedef uint16_t glcd_buffer_t;
 \end{lstlisting}
 
-Set to \lstinline|uint8_t| for smallest RAM footprint, but causes extra CPU time. Set to \lstinline|uint16_t| for fastest processing. There is no speed gain when setting to \lstinline|uint32_t|. It just wastes resources.
+Set to \lstinline|uint8_t| for smallest RAM footprint, but causes extra CPU time. Set to \lstinline|uint16_t| for fastest processing, but wastes unused RAM. There is no speed gain when setting to \lstinline|uint32_t|. It just wastes resources.
 
 \section{Touchscreen}
 \subsection{Touchscreen Initialization}
@@ -727,7 +787,21 @@ Please note that the ADC is setup for 10-bit conversions so the values returned 
 
 \subsection{Touchscreen low level functions}
 
+\subsubsection{Set the ADC speed}
+\ifunc{touchscreen\_setadcspeed}
+\label{sec:setadcspeed}
+To set the ADC speed (for all ADCs), use:
+
+\begin{lstlisting}
+void touchscreen_setadcspeed(uint32_t speed);
+\end{lstlisting}
+
+Note: \lstinline|speed| is one of 0 (divide system clock by 2), 1 (divide system clock by 4), 2 (divide system clock by 6) or 3 (divide system clock by 8). See $\S$~\ref{sec:touchinit}.\\
+Note: call this function \textbf{after} the touchscreen is initialized.\\
+Note: this speed will be set for all ADCs.
+
 \subsubsection{Read raw X position}
+\ifunc{touchscreen\_readrawx}
 To read the current raw X position, use:
 
 \begin{lstlisting}
@@ -738,6 +812,7 @@ Note: this value is only of interest if the touchscreen is pressed\\
 Note: returns the raw X position from the touchscreen. This value is an indication of where the touchscreen is pressed. It is not the actual X position as can be used with the GLCD functions. You need to map the raw X position.
 
 \subsubsection{Read raw Y position}
+\ifunc{touchscreen\_readrawy}
 To read the current raw y position, use:
 
 \begin{lstlisting}
@@ -748,6 +823,7 @@ Note: this value is only of interest if the touchscreen is pressed\\
 Note: returns the raw Y position from the touchscreen. This value is an indication of where the touchscreen is pressed. It is not the actual Y position as can be used with the GLCD functions. You need to map the raw Y position.
 
 \subsubsection{Read raw pressure}
+\ifunc{touchscreen\_pressure}
 To read the raw pressure, use:
 
 \begin{lstlisting}
@@ -757,6 +833,7 @@ uint32_t touchscreen_pressure(void);
 Note: if the touchscreen is \textbf{not} pressed this functions returns a small number, typically 0. Any other values means that the touchscreen is pressed.
 
 \subsubsection{Mapping the raw X and Y values to display coordinates}
+\ifunc{touchscreen\_map}
 To map raw X and Y values to display coordinates, use:
 
 \begin{lstlisting}
@@ -799,6 +876,9 @@ Note: if $thigh = tlow$ the value \lstinline|INT_MIN| is returned.
 \subsection{Touchscreen high level functions}
 
 \subsubsection{Initializing the touchscreen}
+\ifunc{touchscreen\_init}
+\label{sec:touchinit}
+
 To initialize the touchscreen, use:
 
 \begin{lstlisting}
@@ -807,9 +887,11 @@ uint32_t touchscreen_init(ADC_TypeDef *used_ADC);
 
 Note: this function must be called after the clock system is set up.\\
 Note: \lstinline|used_ADC| is an ADC handle. Currently only \lstinline|ADC1| and \lstinline|ADC2| are supported. \lstinline|ADC3| is currently \textbf{not} supported.\\
-Note: if the initialization succeeds a 1 is return, if failing a 0 is returned.
+Note: if the initialization succeeds a 1 is return, if failing a 0 is returned.\\
+Note: the ADC speed is set to the lowest value possible. If you want to change the ADC speed, see $\S$~\ref{sec:setadcspeed}.
 
 \subsubsection{Testing if the touchscreen is pressed}
+\ifunc{touchscreen\_ispressed}
 To test whether the screen is touched, use:
 
 \begin{lstlisting}
@@ -818,10 +900,11 @@ uint32_t touchscreen_ispressed(uint32_t p);
 
 Note: \lstinline|p| is the raw pressure value
 
-Note: a 1 is returned is touchscreen is pressed\\
-Note: a 0 is returned is touchscreen is not pressed\\
+Note: a 1 is returned if touchscreen is pressed\\
+Note: a 0 is returned if touchscreen is not pressed\\
 
 \subsection{Using the touchscreen on rotated displays}
+\index{Rotated touchscreen}
 \label{sec:rottouch}
 Of course, the touchscreen cannot be physically rotated, so you have to use software to fix the rotation.
 
@@ -888,6 +971,7 @@ Note the swapped \lstinline|x| and \lstinline|y|, and the swapped \lstinline|glc
 Note: the pressure is not affected by the rotation.
 
 \subsection{Calibrating the touchscreen}
+\index{Calibrating touchscreen}
 The touchscreen of the Velleman VMA412 is constructed of resistive foils. Normally the resistance and hence the voltage measured is linear propotional to the location where the touchscreen is pressed. Small deficienties during fabrication produce differences between samples of the touchscreen. To compensatie for that, calibration is needed. There are a number of \lstinline|#define|'s to calibrate the touchscreen. These can be found in \lstinline|touchscreen_vma412.h|.
 
 The outer left raw position is set with \lstinline|TOUCH_LEFT|. The outer right raw position is set with \lstinline|TOUCH_RIGHT|. The outer top raw position is set with \lstinline|TOUCH_TOP|. The outer bottom raw position is set with \lstinline|TOUCH_BOTTOM|.
@@ -960,9 +1044,19 @@ Some todo's left:
 \item Exchange top/bottom and left/right;
 \item Fix use of ADC3 for STM32F446;
 \item Make C++ wrappers;
+\item Make C++ wrappers with AdaFruit based names. This should minimize porting Arduino based software;
 \item Put characters in RAM so new characters can be defined, overwriting older ones;
 \item High-level touchscreen X and Y read functions (needs rotation information).
 \end{itemize}
+
+%% Add index to toc with clickable reference
+\cleardoublepage
+\phantomsection
+\addcontentsline{toc}{section}{\indexname}
+% Next doesn't work with imakeidx, use \indexsetup{othercode=\thispagestyle{fancy}}
+%\thispagestyle{fancy}
+
+\printindex
 
 
 \end{document}
