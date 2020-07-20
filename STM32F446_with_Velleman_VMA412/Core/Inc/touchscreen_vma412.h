@@ -46,6 +46,8 @@ extern "C"
 {
 #endif
 
+#include <stdint.h>
+
 #include "main.h"
 
 /* Driver version */
@@ -66,6 +68,9 @@ extern "C"
 /* used_ADC must be one of ADC1 or ADC2. ADC3 currently doesn't work TODO*/
 /* 1 = success, 0 = failure */
 uint32_t touchscreen_init(ADC_TypeDef *used_ADC);
+
+/* Set the ADC speed, use with care */
+void touchscreen_setadcspeed(uint32_t speed);
 
 /* Read raw X position */
 uint32_t touchscreen_readrawx(void);
