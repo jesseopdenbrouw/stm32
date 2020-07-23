@@ -1,7 +1,7 @@
 
 %%% glcd_and_touchscreen_functions_for_velleman_VMA412.tex
 %%%
-%%%   Documentation for version 0.1rc1
+%%%   Documentation for version 0.1rc2
 %%%
 %%%
 %%% Copyright 2020 J.E.J. op den BRouw
@@ -34,7 +34,8 @@
 \indexsetup{othercode=\footnotesize}
 \makeindex[columns=2]
 %\usepackage{showidx}
-\newcommand{\ifunc}[1]{\index{\texttt{#1}}}
+%\newcommand{\ifunc}[1]{\index{\texttt{#1}}}
+\newcommand{\ifunc}[1]{\index{#1@\texttt{#1}}}
 
 
 \usepackage{listings}
@@ -48,7 +49,7 @@
 }
 
 
-\author{Version 0.1rc1\\[2ex]Jesse op den Brouw\thanks{Please mail me at: \href{mailto:J.E.J.opdenBrouw@hhs.nl}{J.E.J.opdenBrouw@hhs.nl}}\\The Hague University of Applied Sciences\\(THUAS)}
+\author{Version 0.1rc2\\[2ex]Jesse op den Brouw\thanks{Please mail me at: \href{mailto:J.E.J.opdenBrouw@hhs.nl}{J.E.J.opdenBrouw@hhs.nl}}\\The Hague University of Applied Sciences\\(THUAS)}
 \title{Graphic LCD and Touchscreen Functions for Velleman VMA412 with ILI9341 Controller used with a STM32F446 Nucleo Board}
 \date{\today}
 
@@ -159,6 +160,7 @@ glcd_ili9341_vma412.c   -- place in Core/Src, functions to call
 touchscreen_vma412.h    -- place in Core/Inc, definitions, typedefs etc
 touchscreen_vma412.c    -- place in Core/Src, functions to call
 main.c                  -- place in Core/Src, demo using functions
+woof_map.c              -- place in Core/Src, used in the demo
 \end{lstlisting}
 
 
@@ -253,6 +255,7 @@ void glcd_init(void);
 \subsection{Very low GLCD functions}
 
 \subsubsection{Setting the write delay}
+\label{sec:writedelay}
 \ifunc{glcd\_set\_write\_pulse\_delay}
 \textbf{Note:} use with care.\\
 Sets the delay for write actions. There is no need to call this function as the correct timing is calculated according to the system clock speed after the clock system is set up, but you can tweak this value to get maximum performance. \lstinline|delay| must be greater than 0. The function prototype is:
@@ -261,6 +264,7 @@ void glcd_set_write_pulse_delay(uint32_t delay);
 \end{lstlisting}
 
 \subsubsection{Setting the read delay}
+\label{sec:readdelay}
 \ifunc{glcd\_set\_read\_pulse\_delay}
 \textbf{Note:} use with care.\\
 Sets the delay for read actions. There is no need to call this function as the correct timing is calculated according to the system clock speed after the clock system is set up, but you can tweak this value to get maximum performance. \lstinline|delay| must be greater than 0. The function prototype is:
@@ -283,7 +287,7 @@ void glcd_read_terminate(uint16_t cmd,            // The command
                          glcd_buffer_t data[]);   // The buffer
 \end{lstlisting}
 
-Note: is you read pixel color information (scan line), the first \lstinline|uint16_t| of the buffer is useless information.
+Note: if you read pixel color information (one or more pixels), the first element of the buffer is useless information.
 
 \subsubsection{Writing data to the display}
 \ifunc{glcd\_write}
@@ -308,7 +312,7 @@ The low level functions use an internal buffer. The buffer is of type \lstinline
 
 Set to \lstinline|uint8_t| for minimal resources\\
 Set to \lstinline|uint16_t| for best speed\\
-Set to \lstinline|uint32_t| for maximum capacity (not recommended)
+Set to \lstinline|uint32_t| not recommended, just wastes RAM.
  
 \subsection{GLCD high level commands}
 
@@ -333,14 +337,14 @@ Where \lstinline|rot| is one of:
 
 \begin{lstlisting}
 GLCD_SCREEN_ROT0           // Standard landscape, default
-GLCD_SCREEN_ROT90          // Rotate 90 degrees
-GLCD_SCREEN_ROT180         // Rotate 180 degrees
-GLCD_SCREEN_ROT270         // Rotate 270 degrees
+GLCD_SCREEN_ROT90          // Rotate 90 degrees counter clockwise
+GLCD_SCREEN_ROT180         // Rotate 180 degrees counter clockwise
+GLCD_SCREEN_ROT270         // Rotate 270 degrees counter clockwise
 \end{lstlisting}
 
 Notes on rotation:
 
-When you rotate the display, the current display contents are not deleted. You have to clear the display explicitly.
+When you rotate the display, the current display contents are neighter deleted nor rotated. You have to clear the display explicitly.
 
 The default rotation is 0$^\circ$. The display is in landscape with the SD-card socket on the right of the display. A rotation of 90$^\circ$ sets the display is portrait mode with the SD-card socket at the bottom of the display. A rotation of 180$^\circ$ sets the display in landscape mode with the SD-card socket to the left of the Display. A rotation of 270$^\circ$ set the display in portrait mode with the SD-card socket at the top of the display.
 
@@ -416,6 +420,19 @@ void glcd_plotline(uint16_t x0,            // x start point
 
 Note: the part of the line that is exceeding the dimensions of the display are not plotted.
 
+\subsubsection{Set magnification for character plotting}
+\ifunc{glcd\_setcharsize}
+To set the magnification for character plotting, use:
+
+\begin{lstlisting}
+void glcd_setcharsize(uint16_t x,       -- x magnigication
+                      uint16_t y);      -- y magnification
+\end{lstlisting}
+
+Note: \lstinline|x| and \lstinline|y| must be greater that 0.\\
+Note: sensible values are 1, 2, 3 and 4.\\
+Note: not used for console based printing. Console based printing is always with magnification 1 for x and y.
+
 \subsubsection{Plot a character using buildin font}
 \ifunc{glcd\_plotchar}
 To plot a character using the buildin font (5x8), use:
@@ -427,8 +444,8 @@ void glcd_plotchar(uint16_t x,             // x coordinate
                    glcd_color_t bg);       // background color
 \end{lstlisting}
 
-Note: character is one of 0 -- 255 (no special C treatment)\\
-Note: if \lstinline|color| is equal to \lstinline|bg| then pixels having background color are not printed!
+Note: character is one of 0 -- 255 (no special C treatment)..\\
+Note: if \lstinline|color| is equal to \lstinline|bg| then pixels having background color are not printed.
 
 \subsubsection{Plot a string using buildin font}
 \ifunc{glcd\_plotstring}
@@ -442,13 +459,13 @@ void glcd_plotstring(uint16_t x,                  // x coordinate
                      glcd_spacing_t spacing);     // spacing
 \end{lstlisting}
 
-Note: a \lstinline|\0| terminates a string (as in C). This means that buildin character 0 cannot be printed\\
-Note: if \lstinline|color| is equal to \lstinline|bg| then pixels having background color are not printed\\
+Note: a \lstinline|\0| terminates a string (as in C). This means that buildin character 0 cannot be printed.\\
+Note: if \lstinline|color| is equal to \lstinline|bg| then pixels having background color are not printed.\\
 Note: \lstinline|spacing| is one of:
 \begin{lstlisting}
 GLCD_STRING_CONDENSED  // zero pixels apart
-GLCD_STRING_NORMAL     // one pixel apart
-GLCD_STRING_WIDE       // two pixels apart
+GLCD_STRING_NORMAL     // magnification x pixel apart
+GLCD_STRING_WIDE       // 2 times magnification x pixels apart
 \end{lstlisting}
 
 \subsubsection{Plot a rectangle}
@@ -580,16 +597,29 @@ Note: this function uses \lstinline|sinf| and \lstinline|cosf| math functions, u
 To plot a triangle, use:
 
 \begin{lstlisting}
-void glcd_plottriangle(uint16_t x1,          // start x
-                       uint16_t y1,          // start y
-                       uint16_t x2,          // second x
-                       uint16_t y2,          // second y
-                       uint16_t x3,          // last x
-                       uint16_t y3,          // last y
+void glcd_plottriangle(uint16_t x0,          // start x
+                       uint16_t y0,          // start y
+                       uint16_t x1,          // second x
+                       uint16_t y1,          // second y
+                       uint16_t x2,          // third x
+                       uint16_t y2,          // third y
                        glcd_color_t color);  // color
 \end{lstlisting}
 
+\subsubsection{Plot a filled triangle}
+\ifunc{glcd\_plottrianglefill}
+To plot a filled triangle, use:
 
+\begin{lstlisting}
+void glcd_plottrianglefill(uint16_t x0,           // first x
+                           uint16_t y0,           // first y
+                           uint16_t x1,           // second x
+                           uint16_t y1,           // second y
+                           uint16_t x2,           // third x
+                           uint16_t y2,           // third y
+                           glcd_color_t color);   // color
+
+\end{lstlisting}
 \subsubsection{Plot a 2-color bitmap}
 \ifunc{glcd\_plotbitmap}
 To plot a 2-color bitmap, use:
@@ -625,7 +655,10 @@ Note: each pixel is specified with a byte (\lstinline|uint8_t|). This is an inde
 Note: each color is specified with a 32-bit RGB color specification. This means that each color takes up four bytes and the total palette size is 1024 bytes. The byte order for each indexed color is as follows: first byte is red, second byte is green, third byte is blue, fourth byte is not used.\\
 Note: is \lstinline|palette| is equal to \lstinline|NULL| then the palette is at the start of the image and the image bytes follow the palette.
 
-Note: you will get compiler warnings if your bitmap is in RAM, because \lstinline|bitmap| is qualified as \lstinline|const|.
+Note: you will get compiler warnings if your bitmap is in RAM, because \lstinline|bitmap| is qualified as \lstinline|const|.\\
+Note: you will get compiler warnings if your palette is in RAM, because \lstinline|palette| is qualified as \lstinline|const|.
+
+Note: a full 320x240 pixels image needs 77824 bytes of ROM.
 
 Note: if you need to convert your image to a 256-color indexed image, have a look at \url{https://lvgl.io/tools/imageconverter}.
 
@@ -781,7 +814,7 @@ Set to \lstinline|uint8_t| for smallest RAM footprint, but causes extra CPU time
 
 \section{Touchscreen}
 \subsection{Touchscreen Initialization}
-Before using any of the touchscreen functions, you have to initialize the touchscreen. Reading the X and Y coordinates of the pressed touchscreen point needs one of the onboard ADC's. The function \lstinline|touchscreen_init| initializes the selected ADC. Please note that the selected ADC must be dedicated to the touchscreen functions, since the ADC is setup only once. Sharing the ADC with other functions is not recommended.
+Before using any of the touchscreen functions, you have to initialize the touchscreen. Reading the X and Y coordinates of the pressed touchscreen point needs one of the onboard ADC's. The function \lstinline|touchscreen_init| initializes the selected ADC. Please note that the selected ADC must be dedicated to the touchscreen functions, since the ADC is setup only once. Sharing the ADC with other functions is not recommended. If the selected ADC can't be initialized, the functions returning values all will return 0.
 
 Please note that the ADC is setup for 10-bit conversions so the values returned are from 0 to 1023 (inclusive).
 
@@ -798,7 +831,8 @@ void touchscreen_setadcspeed(uint32_t speed);
 
 Note: \lstinline|speed| is one of 0 (divide system clock by 2), 1 (divide system clock by 4), 2 (divide system clock by 6) or 3 (divide system clock by 8). See $\S$~\ref{sec:touchinit}.\\
 Note: call this function \textbf{after} the touchscreen is initialized.\\
-Note: this speed will be set for all ADCs.
+Note: this speed will be set for all ADCs.\\
+Note: make sure that the maximum clock frequency is not exceeded. Consult the microcontroller's data sheet.
 
 \subsubsection{Read raw X position}
 \ifunc{touchscreen\_readrawx}
@@ -809,7 +843,8 @@ uint32_t touchscreen_readrawx(void);
 \end{lstlisting}
 
 Note: this value is only of interest if the touchscreen is pressed\\
-Note: returns the raw X position from the touchscreen. This value is an indication of where the touchscreen is pressed. It is not the actual X position as can be used with the GLCD functions. You need to map the raw X position.
+Note: returns the raw X position from the touchscreen. This value is an indication of where the touchscreen is pressed. It is not the actual X position as can be used with the GLCD functions. You need to map the raw X position.\\
+Note: this function will return 0 if no ADC is set up.
 
 \subsubsection{Read raw Y position}
 \ifunc{touchscreen\_readrawy}
@@ -820,7 +855,8 @@ uint32_t touchscreen_readrawy(void);
 \end{lstlisting}
 
 Note: this value is only of interest if the touchscreen is pressed\\
-Note: returns the raw Y position from the touchscreen. This value is an indication of where the touchscreen is pressed. It is not the actual Y position as can be used with the GLCD functions. You need to map the raw Y position.
+Note: returns the raw Y position from the touchscreen. This value is an indication of where the touchscreen is pressed. It is not the actual Y position as can be used with the GLCD functions. You need to map the raw Y position.\\
+Note: this function will return 0 if no ADC is set up.
 
 \subsubsection{Read raw pressure}
 \ifunc{touchscreen\_pressure}
@@ -830,7 +866,8 @@ To read the raw pressure, use:
 uint32_t touchscreen_pressure(void);
 \end{lstlisting}
 
-Note: if the touchscreen is \textbf{not} pressed this functions returns a small number, typically 0. Any other values means that the touchscreen is pressed.
+Note: if the touchscreen is \textbf{not} pressed this functions returns a small number, typically 0. Any other values means that the touchscreen is pressed.\\
+Note: this function will return 0 if no ADC is set up.
 
 \subsubsection{Mapping the raw X and Y values to display coordinates}
 \ifunc{touchscreen\_map}
@@ -849,6 +886,8 @@ Note: \lstinline|tlow| is lowest raw touchscreen value (X or Y)\\
 Note: \lstinline|thigh| is highest raw touchscreen value (X or Y)\\
 Note: \lstinline|slow| is lowest GLCD display value (X or Y)\\
 Note: \lstinline|shigh| is highest GLCD display value (X or Y)
+
+Note: you can calibrated the touchscreen, see $\S$~\ref{sec:calibrating}.
 
 Note: the returned value can be negative. This is an indication that the touchscreen is not calibrated correctly.\\
 Note: this function internally uses floats to do the calculations. This will be done using the onboard FPU.
@@ -970,8 +1009,11 @@ Note the swapped \lstinline|x| and \lstinline|y|, and the swapped \lstinline|glc
 
 Note: the pressure is not affected by the rotation.
 
+Note: in Arduino based software, the touchscreen is not rotated by software, and you need to rotate the values of X and Y yourself. Set up the touchscreen for 90$^\circ$ rotation.
+
 \subsection{Calibrating the touchscreen}
 \index{Calibrating touchscreen}
+\label{sec:calibrating}
 The touchscreen of the Velleman VMA412 is constructed of resistive foils. Normally the resistance and hence the voltage measured is linear propotional to the location where the touchscreen is pressed. Small deficienties during fabrication produce differences between samples of the touchscreen. To compensatie for that, calibration is needed. There are a number of \lstinline|#define|'s to calibrate the touchscreen. These can be found in \lstinline|touchscreen_vma412.h|.
 
 The outer left raw position is set with \lstinline|TOUCH_LEFT|. The outer right raw position is set with \lstinline|TOUCH_RIGHT|. The outer top raw position is set with \lstinline|TOUCH_TOP|. The outer bottom raw position is set with \lstinline|TOUCH_BOTTOM|.
@@ -982,8 +1024,20 @@ Note all values must be within the values 0 to 1023 (inclusive).
 
 Reading raw values is done by oversamping and then the mean of the samples is returned. You can set the number of samples using the define \lstinline|TOUCH_SAMPLES|. The default value is 16. This value must be 2 or greater. Lower values speed up the reading of the touchscreen.
 
+\subsection{Using the touchscreen ADC for reading analog values}
+Some STM32F4s only have one ADC (such as the STM32F411), so you need the touchscreen ADC to do your readings. Here are some rules to obey:
+
+\begin{itemize}
+\item Never ever disable the ADC, the ADC is enabled only once by \lstinline|touchscreen_init|;
+\item You can change the conversion speed with \lstinline|touchscreen_setadcspeed|, see $\S$~\ref{sec:setadcspeed}. This will affect all ADCs. The speed is not set back to the original value. Note that if the speed is set too high, the touchscreen functions will not function correctly;
+\item Before conversion, you can set the desired resolution. The touchscreen functions wil set it back to 10 bits;
+\item Don't set any of the trigger modes on the ADC, leave it to software enabled triggering.
+\end{itemize}
+
+
 \section{Debugging or production use}
 If you need to debug the functions, set the compiler optimization to \lstinline|-O0| (no optimization) or \lstinline|-Og| (optimize for debug). If you want to exhibit full speed support set the optimization to \lstinline|-Ofast|. If you need the smallest ROM footprint and have some speed, set the optimization to \lstinline|-Os|.
+
 
 \section{Nice tricks}
 To wait until the touchscreen is touched, use one of
@@ -1007,7 +1061,7 @@ while (touchscreen_ispressed(touchscreen_pressure())) {}
 while (!touchscreen_ispressed(touchscreen_pressure())) {}
 \end{lstlisting}
 
-To print variables, the best way is to use a character buffer and the \lstinline|snprintf| function defined in \lstinline|stdio.h|. Make sure the buffer is large enough:
+To print variables, the best way is to use a character buffer and the \lstinline|snprintf| \ifunc{snprintf} function defined in \lstinline|stdio.h|. Make sure the buffer is large enough:
 
 \begin{lstlisting}
 char buffer[40];
@@ -1027,34 +1081,73 @@ You could ``rewire'' the \lstinline|printf| function by rewriting the \lstinline
 
 
 \section{SD-cards are not supported with this library}
-The SD-card interface needs a complete layer of functions to manipulate the SD-cards (reading, writing, etc.). These functions are not implemented in this library. Best is to use FATFS (\url{http://elm-chan.org/fsw/ff/00index_e.html}).
+\index{SD-cards, not supported}
+The SD-card interface needs a complete layer of functions to manipulate the SD-cards (reading, writing, etc.). These functions are not implemented in this library. Best is to use FATFS (\url{http://elm-chan.org/fsw/ff/00index_e.html}) or set up your STM32 project with the FATFS middleware.
 
 
 \section{Using the VMA412 with other hardware}
 The VMA412 uses 13 pins to do its job. Nearly all of the Arduino compatible pins are used. Only Arduino pin A5 if free, as are digital pins 10 through 13 (for the SD-card functions). But of course you can use the remaining pins on the Morpho connectors.
 
 
+\section{Gory details: timing diagrams}
+For those of you love timing diagrams with hardware, here are some snapshots of the timing for writing one pixel and reading a pixel. If you know how to handle an oscilloscope, you can easily reproduce the next figures. The figures are produced with a Tektronic DPO2004B Digital Oscilloscope, which has four channels available.
+
+For each of the following figures, the Chip Select line (CS) is in yellow, the C/D line (command/data) is in blue, the Write line (WR) is in purple and the Read line (RD) is in green. Before the ILI9431 responds to any information the CS line must be made low.
+
+\subsection{Writing one pixel to the display}
+Writing one pixel to the screen, including a write terminate, takes about 10 $\mu$s (microseconds). The CS-line is low for 9.7 $\mu$s but there is some overhead in calling the function and setting up the datalines. The screenshot is shown if Figure~\ref{fig:10}.
+
+\begin{figure}[!ht]
+\centering
+\includegraphics[width=0.8\textwidth]{pixel_write}
+\caption{Writing one pixel to the display, including write termination.}
+\label{fig:10}
+\end{figure}
+
+To complete writing one pixel data, four partion writes are needed.
+First there are five bytes written to set the X coordinate, then there are five bytes written for the Y coordinate. After that there are four bytes written for the color. At last, the write terminate command is written and CS is brought high. The first byte of each partial write is the command, so the C/D line is low. When writing the other data the C/D line is high. The color bytes are specified in red, green and blue.
+
+Because writing a pixel takes about 10 $\mu$s, you can write about 100000 pixels per second.
+
+\subsection{Reading pixel data from the display}
+Reading a pixel is started by writing the pixel coordinate. After that, four bytes are read. The first byte read in is useless information, and the next three bytes are the color information in red, green and blue. After that, a read terminate is issued.
+
+\begin{figure}[!ht]
+\centering
+\includegraphics[width=0.8\textwidth]{pixel_read}
+\caption{Reading one pixel to the display, includes termination.}
+\label{fig:11}
+\end{figure}
+
+\subsection{Write and read pulse delay}
+Please note that reading informations takes up more time that writing information. This is because the write and write pulse width need to be different. For a write the pulse width has to be 66 ns and for a read the pulse has to be 450 ns. Figure~\ref{fig:12} shows the difference.
+
+\begin{figure}[!ht]
+\centering
+\includegraphics[width=0.8\textwidth]{write_read_delay}
+\caption{The write and read pulse delay.}
+\label{fig:12}
+\end{figure}
+
+In this setup, the write pulse delay is about 96 ns and the read pulse delay is about 620 ns, so there is some room for speeding up the write and read. This is because the automatic calculations of the delays is somewhat pessimistic \textsl{and} writing and reading the individual bits takes some time. If you want to experiment with the pulse widths, please see $\S$~\ref{sec:writedelay} and $\S$~\ref{sec:readdelay}, but you wind up with a non-responsive display. If this happens, just restore the orginal values and you'll be fine.
+
 \section{Todo's}
 Some todo's left:
 
 \begin{itemize}
-\item Quarter circle with fill plot function, will be faster than flood fill circles;
-\item Rectangle with rounded corners to support buttons to be pressed;
 \item Regular polygon plot function, with angle;
 \item Exchange top/bottom and left/right;
 \item Fix use of ADC3 for STM32F446;
 \item Make C++ wrappers;
 \item Make C++ wrappers with AdaFruit based names. This should minimize porting Arduino based software;
-\item Put characters in RAM so new characters can be defined, overwriting older ones;
-\item High-level touchscreen X and Y read functions (needs rotation information).
+\item Option to put characters in RAM so new characters can be defined, overwriting older ones;
+\item High-level touchscreen X and Y read functions (needs rotation information);
 \end{itemize}
 
 %% Add index to toc with clickable reference
 \cleardoublepage
 \phantomsection
 \addcontentsline{toc}{section}{\indexname}
-% Next doesn't work with imakeidx, use \indexsetup{othercode=\thispagestyle{fancy}}
-%\thispagestyle{fancy}
 
 \printindex
 
