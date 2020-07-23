@@ -7,8 +7,8 @@
 
 Software License Agreement (BSD License)
 
-Version: 0.1rc1
-Date: 2020/07/19
+Version: 0.1rc2
+Date: 2020/07/23
 
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
@@ -51,7 +51,7 @@ extern "C"
 #include "main.h"
 
 /* Driver version */
-#define TOUCH_VERSION "STM32 VMA412 TS Driver v 0.1rc1 (Jul 19 2020)"
+#define TOUCH_VERSION "STM32 VMA412 TS Driver v 0.1rc2 (Jul 23 2020)"
 
 /* Calibrate the touchscreen */
 #define TOUCH_LEFT 120
