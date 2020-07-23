@@ -390,6 +390,14 @@ void demo_glcd(void) {
 	}
 	GET_CLOCK(18);
 
+	glcd_puts("Plotting 100 filled triangles...\n");
+	START_CLOCK();
+	for (i = 0; i < 100; i++) {
+		glcd_plottrianglefill(100, 100, 150, 150, 80, 180, color);
+		color += 0x030104;
+	}
+	GET_CLOCK(17);
+
 	glcd_puts("\fFilling objects...\n");
 
     START_CLOCK();
@@ -454,35 +462,6 @@ void demo_glcd(void) {
 
 	glcd_delay_ms(5000);
 
-	/* Plot the THUAS bitmap */
-	glcd_cls(GLCD_COLOR_WHITE);
-	START_CLOCK();
-	glcd_plotbitmap(0, 72, GLCD_THUAS_DEFAULT_BITMAP, 320, 96, GLCD_COLOR_THUASGREEN, GLCD_COLOR_WHITE);
-	GET_CLOCK(10);
-	//glcd_plotbitmap(0, 0, GLCD_THUAS_DEFAULT_BITMAP_SMALL, 160, 48, GLCD_COLOR_THUASGREEN, GLCD_COLOR_WHITE);
-	glcd_plotstring(100, 200, "Department of Electrical Engineering", GLCD_COLOR_THUASGREEN, GLCD_COLOR_WHITE, GLCD_STRING_NORMAL);
-
-	/* Invert the display */
-	for (i=1; i<=10; i++) {
-		glcd_inversion(GLCD_DISPLAY_INVERSION_ON);
-		glcd_delay_ms(100);
-		glcd_inversion(GLCD_DISPLAY_INVERSION_OFF);
-		glcd_delay_ms(100);
-	}
-
-	/* Set the display to idle */
-	glcd_idle(GLCD_DISPLAY_IDLE_ON);
-	glcd_delay_ms(2000);
-	glcd_idle(GLCD_DISPLAY_IDLE_OFF);
-
-	/* Display off and on */
-	glcd_display(GLCD_DISPLAY_OFF);
-	glcd_delay_ms(2000);
-	glcd_display(GLCD_DISPLAY_ON);
-    glcd_delay_ms(1000);
-
-    glcd_plotstring(10, 20, "Brought to you by:", GLCD_COLOR_THUASGREEN, GLCD_COLOR_WHITE, GLCD_STRING_NORMAL);
-	glcd_delay_ms(1000);
 
 	/* Console based printing */
 	glcd_puts("\fConsole based printing");
@@ -522,6 +501,36 @@ void demo_glcd(void) {
 #endif
 
 	glcd_delay_ms(2000);
+
+	/* Plot the THUAS bitmap */
+	glcd_cls(GLCD_COLOR_WHITE);
+	START_CLOCK();
+	glcd_plotbitmap(0, 72, GLCD_THUAS_DEFAULT_BITMAP, 320, 96, GLCD_COLOR_THUASGREEN, GLCD_COLOR_WHITE);
+	GET_CLOCK(10);
+	//glcd_plotbitmap(0, 0, GLCD_THUAS_DEFAULT_BITMAP_SMALL, 160, 48, GLCD_COLOR_THUASGREEN, GLCD_COLOR_WHITE);
+	glcd_plotstring(100, 200, "Department of Electrical Engineering", GLCD_COLOR_THUASGREEN, GLCD_COLOR_WHITE, GLCD_STRING_NORMAL);
+
+	/* Invert the display */
+	for (i=1; i<=10; i++) {
+		glcd_inversion(GLCD_DISPLAY_INVERSION_ON);
+		glcd_delay_ms(100);
+		glcd_inversion(GLCD_DISPLAY_INVERSION_OFF);
+		glcd_delay_ms(100);
+	}
+
+	/* Set the display to idle */
+	glcd_idle(GLCD_DISPLAY_IDLE_ON);
+	glcd_delay_ms(2000);
+	glcd_idle(GLCD_DISPLAY_IDLE_OFF);
+
+	/* Display off and on */
+	glcd_display(GLCD_DISPLAY_OFF);
+	glcd_delay_ms(2000);
+	glcd_display(GLCD_DISPLAY_ON);
+    glcd_delay_ms(1000);
+
+    glcd_plotstring(10, 20, "Brought to you by:", GLCD_COLOR_THUASGREEN, GLCD_COLOR_WHITE, GLCD_STRING_NORMAL);
+	glcd_delay_ms(1000);
 
 	/* Measurement of 50 ms */
     START_CLOCK();
@@ -704,18 +713,36 @@ void demo_characterset(void) {
 #ifdef USE_TEST
 void test(void) {
 
-	glcd_putchar('\f');
+	glcd_cls(GLCD_COLOR_RED);
 
+//	glcd_plotrectroundedfill(100, 100, 100, 40, 15, GLCD_COLOR_RED);
 //	glcd_plotrectrounded(100, 100, 100, 40, 15, GLCD_COLOR_YELLOW);
 //	glcd_plotstring(120,120, "Tekst", GLCD_COLOR_YELLOW, GLCD_COLOR_YELLOW, GLCD_STRING_NORMAL);
 //	glcd_floodfill(100+15, 100+20, GLCD_COLOR_RED, GLCD_COLOR_BLACK);
 
 //	glcd_plotcirclefill(100, 100, 30, GLCD_COLOR_YELLOW);
-	glcd_plotcirclehalffill(100, 100, 30, GLCD_CORNER_BOTH, -5, GLCD_COLOR_YELLOW);
+//	glcd_plotcirclehalffill(100, 100, 30, GLCD_CORNER_BOTH, -5, GLCD_COLOR_YELLOW);
 //	glcd_plotcircle(180, 180, 30, GLCD_COLOR_YELLOW);
 //	glcd_floodfill(180, 180, GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK);
 
 //	glcd_plotrectroundedfill((glcd_getwidth()-100)/2, (glcd_getheight()-50)/2, 100, 50, 15, GLCD_COLOR_YELLOW);
+
+//	glcd_plottrianglefill(100, 100, 150, 150, 80, 180, GLCD_COLOR_YELLOW);
+//	glcd_plottriangle(100, 100, 150, 150, 80, 180, GLCD_COLOR_RED);
+
+	glcd_plotstring(10, 48, "Hallo", GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+
+	glcd_setcharsize(2, 2);
+
+	glcd_plotstring(10, 90, "Hallo", GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+
+	glcd_setcharsize(3, 3);
+
+	glcd_plotstring(10, 120, "Hallo", GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+
+	glcd_puts("Hallo");
+
+	glcd_setcharsize(1, 1);
 
 	/* Wait for the screen to be (re)touched */
 	while (touchscreen_ispressed(touchscreen_pressure())) {}
