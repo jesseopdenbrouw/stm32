@@ -7,8 +7,8 @@
 
 Software License Agreement (BSD License)
 
-Version: 0.1rc1
-Date: 2020/07/19
+Version: 0.1rc2
+Date: 2020/07/23
 
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
@@ -171,12 +171,13 @@ uint32_t touchscreen_init(ADC_TypeDef *used_ADC) {
 	} else {
 #endif
 		/* Unknown ADC */
+		pADC = NULL;
 		return 0;
 #ifdef ADC
 	}
 #endif
 
-	/* ADC Clock, freq / 30 = 5.6 --> prescaler = 8, for all ADCs */
+	/* ADC Clock, prescaler = 8 (slowest speed), for all ADCs */
 	/* The ADC doesn't have to be that fast for the touchscreen functions, but maybe for other functions */
 	ADC->CCR = (3 << ADC_CCR_ADCPRE_Pos);
 
@@ -193,6 +194,7 @@ uint32_t touchscreen_init(ADC_TypeDef *used_ADC) {
 
 	/* n-bit samples, 0 = 12, 1 = 10, 2 = 8, 3 = 6 */
     /* 10 bit samples used, as in an Arduino */
+	pADC->CR1 &= (3 << ADC_CR1_RES_Pos);
 	pADC->CR1 = (1 << ADC_CR1_RES_Pos);
 
 	/* Sample time = 3 cycles, for channel 0 */
@@ -215,6 +217,12 @@ uint32_t touchscreen_init(ADC_TypeDef *used_ADC) {
  * @out: void
  */
 void touchscreen_setadcspeed(uint32_t speed) {
+
+	/* No ADC configured */
+	if (pADC == NULL) {
+		return;
+	}
+
 	speed &= 0x3;
 
 	ADC->CCR &= ~(3 << ADC_CCR_ADCPRE_Pos);
@@ -230,6 +238,16 @@ void touchscreen_setadcspeed(uint32_t speed) {
 uint32_t touchscreen_readrawx(void) {
 
 	uint32_t XMmoder, YPmoder;
+
+	/* No ADC configured */
+	if (pADC == NULL) {
+		return 0;
+	}
+
+	/* n-bit samples, 0 = 12, 1 = 10, 2 = 8, 3 = 6 */
+    /* 10 bit samples used, as in an Arduino */
+	pADC->CR1 &= (3 << ADC_CR1_RES_Pos);
+	pADC->CR1 = (1 << ADC_CR1_RES_Pos);
 
 	/* Save directions */
 	YPmoder = (YP.pGPIO)->MODER;
@@ -286,6 +304,16 @@ uint32_t touchscreen_readrawx(void) {
 uint32_t touchscreen_readrawy(void) {
 
 	uint32_t XMmoder, YPmoder;
+
+	/* No ADC configured */
+	if (pADC == NULL) {
+		return 0;
+	}
+
+	/* n-bit samples, 0 = 12, 1 = 10, 2 = 8, 3 = 6 */
+    /* 10 bit samples used, as in an Arduino */
+	pADC->CR1 &= (3 << ADC_CR1_RES_Pos);
+	pADC->CR1 = (1 << ADC_CR1_RES_Pos);
 
 	/* Save directions */
 	YPmoder = (YP.pGPIO)->MODER;
@@ -345,6 +373,16 @@ uint32_t touchscreen_pressure(void) {
 
 	uint32_t p1, p2;
 	uint32_t XMmoder, YPmoder;
+
+	/* No ADC configured */
+	if (pADC == NULL) {
+		return 0;
+	}
+
+	/* n-bit samples, 0 = 12, 1 = 10, 2 = 8, 3 = 6 */
+    /* 10 bit samples used, as in an Arduino */
+	pADC->CR1 &= (3 << ADC_CR1_RES_Pos);
+	pADC->CR1 = (1 << ADC_CR1_RES_Pos);
 
 	/* Save directions */
 	YPmoder = (YP.pGPIO)->MODER;
@@ -409,7 +447,7 @@ uint32_t touchscreen_pressure(void) {
  * @in: thigh --> touchscreen raw higest value
  * @in: slow  --> screen raw lowest value
  * @in: shigh --> screen raw higest value
- * @out: remapped value (note: signed integer)
+ * @out: remapped value (note: signed integer, so may be negative)
  */
 int32_t touchscreen_map(uint32_t value, uint32_t tlow, uint32_t thigh, uint32_t slow, uint32_t shigh) {
 
