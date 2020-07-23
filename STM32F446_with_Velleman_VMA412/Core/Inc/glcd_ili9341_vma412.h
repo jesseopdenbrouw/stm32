@@ -7,8 +7,8 @@
 
 Software License Agreement (BSD License)
 
-Version: 0.1rc1
-Date: 2020/07/19
+Version: 0.1rc2
+Date: 2020/07/23
 
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
@@ -49,7 +49,7 @@ extern "C"
 #include <stdint.h>
 
 /* Driver version */
-#define GLCD_VERSION "STM32 VMA412 GLCD Driver v 0.1rc1 (Jul 19 2020)"
+#define GLCD_VERSION "STM32 VMA412 GLCD Driver v 0.1rc2 (Jul 23 2020)"
 
 
 /* Should we use flood fill? */
@@ -189,6 +189,8 @@ void glcd_plotline(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, glcd_colo
 
 /* Plot a character using the standard font */
 void glcd_plotchar(uint16_t x, uint16_t y, uint8_t c, glcd_color_t color, glcd_color_t bg);
+/* Set the x and y magnification */
+void glcd_setcharsize(uint16_t x, uint16_t y);
 /* Plot a string using the standard font. Special characters are rendered using the font
  * and are not processed special. A \0 terminates the string. */
 void glcd_plotstring(uint16_t x, uint16_t y, char str[], glcd_color_t color, glcd_color_t bg, glcd_spacing_t spacing);
@@ -206,6 +208,8 @@ void glcd_plotcirclehalffill(uint16_t x0, uint16_t y0, uint16_t r, glcd_cornerha
 void glcd_plotarc(uint16_t xc, uint16_t yc, uint16_t r, float start, float stop, glcd_color_t color);
 #endif
 void glcd_plottriangle(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t x3, uint16_t y3, glcd_color_t color);
+void glcd_plottrianglefill(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, glcd_color_t color);
+
 
 /* Plot a two-color bitmap on the display */
 void glcd_plotbitmap(uint16_t x, uint16_t y, const uint8_t bitmap[], uint16_t w, uint16_t h, glcd_color_t color, glcd_color_t bg);
