@@ -7,8 +7,8 @@
 
 Software License Agreement (BSD License)
 
-Version: 0.1rc1
-Date: 2020/07/19
+Version: 0.1rc2
+Date: 2020/07/23
 
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
@@ -109,6 +109,10 @@ static glcd_buffer_t glcd_data[3*GLCD_WIDTH+1];
 /* The width and the height of the display */
 static uint16_t glcd_width = GLCD_WIDTH;
 static uint16_t glcd_height = GLCD_HEIGHT;
+
+/* The size for plotting characters (not console based printing) */
+static uint16_t glcd_sizex = 1;
+static uint16_t glcd_sizey = 1;
 
 /* Standard 5x8 font from AdaFruit */
 #ifdef GLCD_CHARCTERS_IN_RAM
@@ -1137,13 +1141,34 @@ void glcd_plotchar(uint16_t x, uint16_t y, uint8_t c, glcd_color_t color, glcd_c
 		line = glcd_font[c * 5 + i];
 		for (j = 0; j < 8; j++, line >>= 1) {
 			if (line & 1) {
-				glcd_plotpixel(x + i, y + j, color);
+				if (glcd_sizex == 1 && glcd_sizey == 1) {
+					glcd_plotpixel(x + i, y + j, color);
+				} else {
+					glcd_plotrectfill(x + i * glcd_sizex, y + j * glcd_sizey, glcd_sizex, glcd_sizey, color);
+				}
 			} else if (bg != color) {
 				/* Plot background color, omit if background color == foreground color */
-				glcd_plotpixel(x + i, y + j, bg);
+				if (glcd_sizex == 1 && glcd_sizey == 1) {
+					glcd_plotpixel(x + i, y + j, bg);
+				} else {
+					glcd_plotrectfill(x + i * glcd_sizex, y + j * glcd_sizey, glcd_sizex, glcd_sizey, bg);
+				}
 			}
 		}
 	}
+}
+
+/* Function glcd_setcharsize
+ * Sets the magnification of the plotted characters
+ * @public
+ * @in: x  -- the size in the x direction
+ * @in: y  -- the size in the y direction
+ * @out: void
+ * Note: x and y have a minimum of 1
+ */
+void glcd_setcharsize(uint16_t x, uint16_t y) {
+	glcd_sizex = (x>0) ? x : 1;
+	glcd_sizey = (y>0) ? y : 1;
 }
 
 /* Function glcd_plotstring
@@ -1167,20 +1192,28 @@ void glcd_plotstring(uint16_t x, uint16_t y, char str[], glcd_color_t color, glc
 
 	for (i=0; str[i] != '\0'; i++) {
 		glcd_plotchar(x, y, (uint8_t) str[i], color, bg);
-		x += 4;
+		x += 4*glcd_sizex;
 		switch (spacing) {
 			case GLCD_STRING_WIDE:
-				x++;
+				x += glcd_sizex;
 				if (bg != color) {
-					glcd_plotverticalline(x, y, 8, bg);
+					if (glcd_sizex == 1 && glcd_sizey == 1) {
+						glcd_plotverticalline(x, y, 8, bg);
+					} else {
+						glcd_plotrectfill(x, y, glcd_sizex, 8*glcd_sizey, bg);
+					}
 				}
 			case GLCD_STRING_NORMAL:
-				x++;
+				x += glcd_sizex;
 				if (bg != color) {
-					glcd_plotverticalline(x, y, 8, bg);
+					if (glcd_sizex == 1 && glcd_sizey == 1) {
+						glcd_plotverticalline(x, y, 8, bg);
+					} else {
+						glcd_plotrectfill(x, y, glcd_sizex, 8*glcd_sizey, bg);
+					}
 				}
 			case GLCD_STRING_CONDENSED:
-			default: x++;
+				x += glcd_sizex;
 		}
 	}
 }
@@ -1782,6 +1815,80 @@ void glcd_plottriangle(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint1
 	glcd_plotline(x3, y3, x1, y1, color);
 }
 
+void glcd_plottrianglefill(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, glcd_color_t color) {
+
+	int16_t a, b, y, last;
+
+	// Sort coordinates by Y order (y2 >= y1 >= y0)
+	if (y0 > y1) {
+		glcd_swap_uint16_t(y0, y1); glcd_swap_uint16_t(x0, x1);
+	}
+	if (y1 > y2) {
+		glcd_swap_uint16_t(y2, y1); glcd_swap_uint16_t(x2, x1);
+	}
+	if (y0 > y1) {
+		glcd_swap_uint16_t(y0, y1); glcd_swap_uint16_t(x0, x1);
+	}
+
+	if(y0 == y2) { // Handle awkward all-on-same-line case as its own thing
+		a = b = x0;
+		if(x1 < a)      a = x1;
+		else if(x1 > b) b = x1;
+		if(x2 < a)      a = x2;
+		else if(x2 > b) b = x2;
+		glcd_plothorizontalline(a, y0, b-a+1, color);
+		return;
+	}
+
+	int32_t
+	dx01 = x1 - x0,
+	dy01 = y1 - y0,
+	dx02 = x2 - x0,
+	dy02 = y2 - y0,
+	dx12 = x2 - x1,
+	dy12 = y2 - y1,
+	sa   = 0,
+	sb   = 0;
+
+	// For upper part of triangle, find scanline crossings for segments
+	// 0-1 and 0-2.  If y1=y2 (flat-bottomed triangle), the scanline y1
+	// is included here (and second loop will be skipped, avoiding a /0
+	// error there), otherwise scanline y1 is skipped here and handled
+	// in the second loop...which also avoids a /0 error here if y0=y1
+	// (flat-topped triangle).
+	if(y1 == y2) last = y1;   // Include y1 scanline
+	else         last = y1-1; // Skip it
+
+	for (y=y0; y<=last; y++) {
+		a   = x0 + sa / dy01;
+		b   = x0 + sb / dy02;
+		sa += dx01;
+		sb += dx02;
+		/* longhand:
+		a = x0 + (x1 - x0) * (y - y0) / (y1 - y0);
+		b = x0 + (x2 - x0) * (y - y0) / (y2 - y0);
+		*/
+		if(a > b) glcd_swap_uint16_t(a,b);
+		glcd_plothorizontalline(a, y, b-a+1, color);
+	}
+
+	// For lower part of triangle, find scanline crossings for segments
+	// 0-2 and 1-2.  This loop is skipped if y1=y2.
+	sa = dx12 * (y - y1);
+	sb = dx02 * (y - y0);
+	for(; y<=y2; y++) {
+		a   = x1 + sa / dy12;
+		b   = x0 + sb / dy02;
+		sa += dx12;
+		sb += dx02;
+		/* longhand:
+		a = x1 + (x2 - x1) * (y - y1) / (y2 - y1);
+		b = x0 + (x2 - x0) * (y - y0) / (y2 - y0);
+		*/
+		if(a > b) glcd_swap_uint16_t(a,b);
+		glcd_plothorizontalline(a, y, b-a+1, color);
+	}
+}
 
 /* Function glcd_scroll_vertical
  * Software based vertical scroll (slow!)
@@ -1838,6 +1945,11 @@ void glcd_putchar(char c) {
     static uint16_t skip=10;
     /* Tab stops at interval of ... */
     static uint16_t tabstop=8;
+    uint16_t sizx = glcd_sizex;
+    uint16_t sizy = glcd_sizey;
+
+    /* Console based printing is always size 1 */
+    glcd_setcharsize(1, 1);
 
 	/* Formfeed clears the screen */
     if (c=='\f') {
@@ -1902,6 +2014,9 @@ void glcd_putchar(char c) {
 		glcd_plotverticalline(xc, yc, 8, GLCD_COLOR_BLACK);
 		xc++;
 	}
+
+    /* Restore character sizes */
+    glcd_setcharsize(sizx, sizy);
 }
 
  /* Function glcd_puts
