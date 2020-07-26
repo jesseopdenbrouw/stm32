@@ -7,8 +7,8 @@
 
 Software License Agreement (BSD License)
 
-Version: 0.1rc2
-Date: 2020/07/23
+Version: 0.1rc3
+Date: 2020/07/26
 
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
@@ -49,7 +49,7 @@ extern "C"
 #include <stdint.h>
 
 /* Driver version */
-#define GLCD_VERSION "STM32 VMA412 GLCD Driver v 0.1rc2 (Jul 23 2020)"
+#define GLCD_VERSION "STM32 VMA412 GLCD Driver v 0.1rc3 (Jul 26 2020)"
 
 
 /* Should we use flood fill? */
@@ -65,7 +65,7 @@ extern "C"
  * still occupies ROM. The character table is then copied
  * from ROM to RAM, when the STM32 is started.
  */
-//#define GLCD_CHARCTERS_IN_RAM
+#define GLCD_CHARCTERS_IN_RAM
 /* Define this to make use of the buildin THUAS bitmaps */
 #define GLCD_HAVE_THUAS_BITMAPS
 
@@ -161,7 +161,7 @@ void glcd_read_terminate(uint16_t cmd, uint16_t amount, glcd_buffer_t data[]);
 /* A write not explicitly terminated */
 void glcd_write(uint16_t cmd, uint16_t amount, const glcd_buffer_t data[]);
 /* Terminate a write */
-void gcld_terminate_write(void);
+void glcd_terminate_write(void);
 /* Sets the delay (width) of the read pulse, USE WITH CARE */
 void glcd_set_read_pulse_delay(uint32_t delay);
 /* Sets the delay (width) of the write pulse, USE WITH CARE */
@@ -191,6 +191,8 @@ void glcd_plotline(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, glcd_colo
 void glcd_plotchar(uint16_t x, uint16_t y, uint8_t c, glcd_color_t color, glcd_color_t bg);
 /* Set the x and y magnification */
 void glcd_setcharsize(uint16_t x, uint16_t y);
+/* Set the font layout of a character. Font must be in RAM. */
+void glcd_setcharlayout(uint16_t c, uint16_t byte0, uint16_t byte1, uint16_t byte2, uint16_t byte3, uint16_t byte4);
 /* Plot a string using the standard font. Special characters are rendered using the font
  * and are not processed special. A \0 terminates the string. */
 void glcd_plotstring(uint16_t x, uint16_t y, char str[], glcd_color_t color, glcd_color_t bg, glcd_spacing_t spacing);
@@ -245,7 +247,7 @@ uint16_t glcd_getwidth(void);
 /* Get the current height of the screen */
 uint16_t glcd_getheight(void);
 
-/* Convert 16 bit colors to glcd_color_t */
+/* Convert 16 bit colors (5/6/5) to glcd_color_t */
 glcd_color_t glcd_convertcolor(uint16_t color16);
 
 #ifdef __cplusplus
