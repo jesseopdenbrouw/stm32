@@ -7,8 +7,8 @@
 
 Software License Agreement (BSD License)
 
-Version: 0.1rc1
-Date: 2020/07/19
+Version: 0.1rc3
+Date: 2020/07/26
 
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
@@ -57,7 +57,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 /* Test for boards */
 #if defined(STM32F446xx)
-#define GLCD_RCC_M (420)
+#define GLCD_RCC_M (336)
 #elif defined(STM32F411xx)
 #define GLCD_RCC_M (250)
 #else
@@ -87,31 +87,31 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #define GET_CLOCK(A) \
 		SysTick->CTRL = 0; \
-		clockval[A] = ((0xffffff - SysTick->VAL)/prescaler)
+		clockval[A] = ((0xffffff - SysTick->VAL)/prescaler);
 
 #define SETUP_CLOCK() \
 	volatile uint32_t clockval[20] = {0}; \
 	volatile uint32_t prescaler = SystemCoreClock/1000000UL/8UL; \
-	const char *clocknames[20] ={ "GLCD initialize:        ", \
-			                      "Clear screen (8x):      ", \
-								  "Plot pixel (100000x):   ", \
-								  "Plot circle (100x):     ", \
-								  "Plot rectangle (1000x): ", \
-								  "Plot filled rect (100x):", \
-								  "Flood fill circle:      ", \
-								  "Flood fill triangle:    ", \
-								  "Flood fill arc:         ", \
-								  "Vertical scroll:        ", \
-								  "Plot bitmap:            ", \
-								  "Printing 53 chars (10x):", \
-								  "Print + vertical shift: ", \
-								  "Plot picture:           ", \
-								  "Not used                ", \
-								  "Not used                ", \
-								  "Not used                ", \
-								  "Not used                ", \
-								  "Not used                ", \
-								  "50 ms delay:            " \
+	const char *clocknames[20] ={ "GLCD initialize:        ", /*  0 */ \
+			                      "Clear screen (8x):      ", /*  1 */ \
+								  "Plot pixel (100000x):   ", /*  2 */ \
+								  "Plot circle (100x):     ", /*  3 */ \
+								  "Plot rectangle (1000x): ", /*  4 */ \
+								  "Plot filled rect (100x):", /*  5 */ \
+								  "Plot filled circ (100x):", /*  6 */ \
+								  "Plot filled tria (100x):", /*  7 */ \
+								  "Flood fill circle:      ", /*  8 */ \
+								  "Flood fill triangle:    ", /*  9 */ \
+								  "Flood fill circ sector: ", /* 10 */ \
+								  "Vertical scroll:        ", /* 11 */ \
+								  "Printing 53 chars (10x):", /* 12 */ \
+								  "Print + vertical shift: ", /* 13 */ \
+								  "Plot 256-color picture: ", /* 14 */ \
+								  "Plot THUAS bitmap:      ", /* 15 */ \
+								  "Not used                ", /* 16 */ \
+								  "Not used                ", /* 17 */ \
+								  "Not used                ", /* 18 */ \
+								  "100 ms delay:           "  /* 19 */ \
 								  };
 
 #define PRINT_CLOCK() {\
@@ -148,6 +148,24 @@ int main(void) {
 
 #ifdef USEMAXMHZ
 
+	/* Enable the power system */
+	do {
+		__IO uint32_t tmpreg = 0x00U;
+		SET_BIT(RCC->APB1ENR, RCC_APB1ENR_PWREN);
+		/* Delay after an RCC peripheral clock enabling */
+		tmpreg = READ_BIT(RCC->APB1ENR, RCC_APB1ENR_PWREN);
+		UNUSED(tmpreg);
+	} while(0U);
+
+	do {
+		__IO uint32_t tmpreg = 0x00U;
+		MODIFY_REG(PWR->CR, PWR_CR_VOS, PWR_REGULATOR_VOLTAGE_SCALE1);
+		/* Delay after an RCC peripheral clock enabling */
+		tmpreg = READ_BIT(PWR->CR, PWR_CR_VOS);
+		UNUSED(tmpreg);
+	} while(0U);
+
+
 	/* 5 wait states */
  	FLASH->ACR = (FLASH_ACR_LATENCY_5WS << FLASH_ACR_LATENCY_Pos);
 
@@ -162,7 +180,7 @@ int main(void) {
 	 * 1 MHz <= HSE/M <= 2 MHz
 	 * 50 <= N <= 432      2 <= M <= 63    P = 2(0),4(1),6(2),8(3)
 	 */
-	RCC->PLLCFGR = (GLCD_RCC_M<<RCC_PLLCFGR_PLLN_Pos) | (5<<RCC_PLLCFGR_PLLM_Pos) |
+	RCC->PLLCFGR = (GLCD_RCC_M<<RCC_PLLCFGR_PLLN_Pos) | (4<<RCC_PLLCFGR_PLLM_Pos) |
 				   (1<<RCC_PLLCFGR_PLLP_Pos) | (1<<RCC_PLLCFGR_PLLSRC_Pos);
 
 	/* Enable HSE, PLL */
@@ -388,7 +406,7 @@ void demo_glcd(void) {
 		glcd_plotcirclefill(60, 180, 50, color);
 		color += 0x030104;
 	}
-	GET_CLOCK(18);
+	GET_CLOCK(6);
 
 	glcd_puts("Plotting 100 filled triangles...\n");
 	START_CLOCK();
@@ -396,7 +414,7 @@ void demo_glcd(void) {
 		glcd_plottrianglefill(100, 100, 150, 150, 80, 180, color);
 		color += 0x030104;
 	}
-	GET_CLOCK(17);
+	GET_CLOCK(7);
 
 	glcd_puts("\fFilling objects...\n");
 
@@ -404,7 +422,7 @@ void demo_glcd(void) {
 	glcd_plotcircle(100, 100, 30, GLCD_COLOR_WHITE);
 #ifdef GLCD_USE_FLOOD_FILL
 	glcd_floodfill(100, 100, GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK);
-    GET_CLOCK(6);
+    GET_CLOCK(8);
 #endif
 
 	/* Plot a triangle and fill it */
@@ -412,7 +430,7 @@ void demo_glcd(void) {
 #ifdef GLCD_USE_FLOOD_FILL
 	START_CLOCK();
 	glcd_floodfill(200, 180, GLCD_COLOR_RED, GLCD_COLOR_BLACK);
-	GET_CLOCK(7);
+	GET_CLOCK(9);
 #endif
 
 	/* Plot an arc */
@@ -423,7 +441,7 @@ void demo_glcd(void) {
 #ifdef GLCD_USE_FLOOD_FILL
 	START_CLOCK();
 	glcd_floodfill(130, 110, GLCD_COLOR_GREEN, GLCD_COLOR_BLACK);
-	GET_CLOCK(8);
+	GET_CLOCK(10);
 #endif
 #endif
 	glcd_delay_ms(2000);
@@ -432,7 +450,7 @@ void demo_glcd(void) {
 	for (int nr=0; nr<240/8; nr++) {
 		START_CLOCK();
 		glcd_scrollvertical(8);
-		GET_CLOCK(9);
+		GET_CLOCK(11);
 	}
 
 	glcd_puts("\fMiscellaneous");
@@ -472,7 +490,7 @@ void demo_glcd(void) {
 	for (i=0; i<10; i++) {
 		glcd_puts("12345678901234567890123456789012345678901234567890ABC\r");
 	}
-    GET_CLOCK(11);
+    GET_CLOCK(12);
     for (int i=0; i<10; i++) {
     	glcd_puts("Hello\n");
     }
@@ -480,7 +498,7 @@ void demo_glcd(void) {
 
 	START_CLOCK();
     glcd_puts("\nConsole based print routines\n\nAnd another line\nAnd another one\b\b\bline\n\b\b\bhello\n");
-    GET_CLOCK(12);
+    GET_CLOCK(13);
 
 	glcd_delay_ms(3000);
 
@@ -497,7 +515,7 @@ void demo_glcd(void) {
 	/* Plot the image */
 	START_CLOCK();
 	glcd_plotbitmap8bpp(0, 0, 320, 240, woof_map, NULL);
-    GET_CLOCK(13);
+    GET_CLOCK(14);
 #endif
 
 	glcd_delay_ms(2000);
@@ -506,7 +524,7 @@ void demo_glcd(void) {
 	glcd_cls(GLCD_COLOR_WHITE);
 	START_CLOCK();
 	glcd_plotbitmap(0, 72, GLCD_THUAS_DEFAULT_BITMAP, 320, 96, GLCD_COLOR_THUASGREEN, GLCD_COLOR_WHITE);
-	GET_CLOCK(10);
+	GET_CLOCK(15);
 	//glcd_plotbitmap(0, 0, GLCD_THUAS_DEFAULT_BITMAP_SMALL, 160, 48, GLCD_COLOR_THUASGREEN, GLCD_COLOR_WHITE);
 	glcd_plotstring(100, 200, "Department of Electrical Engineering", GLCD_COLOR_THUASGREEN, GLCD_COLOR_WHITE, GLCD_STRING_NORMAL);
 
@@ -532,9 +550,9 @@ void demo_glcd(void) {
     glcd_plotstring(10, 20, "Brought to you by:", GLCD_COLOR_THUASGREEN, GLCD_COLOR_WHITE, GLCD_STRING_NORMAL);
 	glcd_delay_ms(1000);
 
-	/* Measurement of 50 ms */
+	/* Measurement of 100 ms */
     START_CLOCK();
-    glcd_delay_ms(50);
+    glcd_delay_ms(100);
     GET_CLOCK(19);
 
     PRINT_CLOCK();
@@ -689,6 +707,8 @@ void demo_characterset(void) {
 
 	glcd_cls(GLCD_COLOR_BLACK);
 
+	//glcd_setcharfont(0, 255, 1, 128, 0, 255);
+
 	/* Plot the complete character table */
 	for (j=0; j<16; j++) {
 		snprintf(buffer, sizeof buffer, "%1lx", j);
@@ -713,39 +733,32 @@ void demo_characterset(void) {
 #ifdef USE_TEST
 void test(void) {
 
+	char buffer[40];
+	volatile uint32_t x, y, p=0;
+
 	glcd_cls(GLCD_COLOR_RED);
 
-//	glcd_plotrectroundedfill(100, 100, 100, 40, 15, GLCD_COLOR_RED);
-//	glcd_plotrectrounded(100, 100, 100, 40, 15, GLCD_COLOR_YELLOW);
-//	glcd_plotstring(120,120, "Tekst", GLCD_COLOR_YELLOW, GLCD_COLOR_YELLOW, GLCD_STRING_NORMAL);
-//	glcd_floodfill(100+15, 100+20, GLCD_COLOR_RED, GLCD_COLOR_BLACK);
+	glcd_puts("\f");
+	glcd_puts("Halllo 123\n");
+	glcd_terminate_write();
 
-//	glcd_plotcirclefill(100, 100, 30, GLCD_COLOR_YELLOW);
-//	glcd_plotcirclehalffill(100, 100, 30, GLCD_CORNER_BOTH, -5, GLCD_COLOR_YELLOW);
-//	glcd_plotcircle(180, 180, 30, GLCD_COLOR_YELLOW);
-//	glcd_floodfill(180, 180, GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK);
+	while (1) {
 
-//	glcd_plotrectroundedfill((glcd_getwidth()-100)/2, (glcd_getheight()-50)/2, 100, 50, 15, GLCD_COLOR_YELLOW);
+		p = touchscreen_pressure();
 
-//	glcd_plottrianglefill(100, 100, 150, 150, 80, 180, GLCD_COLOR_YELLOW);
-//	glcd_plottriangle(100, 100, 150, 150, 80, 180, GLCD_COLOR_RED);
+		x = touchscreen_readrawx();
+		y = touchscreen_readrawy();
 
-	glcd_plotstring(10, 48, "Hallo", GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
+		snprintf(buffer, sizeof buffer, "x = %4lu, y = %4lu, %4lu\r", x, y, p);
+		glcd_puts(buffer);
+//		glcd_plotpixel(100, 100, GLCD_COLOR_YELLOW);
+		glcd_terminate_write();
+		glcd_delay_ms(1);
+	}
 
-	glcd_setcharsize(2, 2);
 
-	glcd_plotstring(10, 90, "Hallo", GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
 
-	glcd_setcharsize(3, 3);
 
-	glcd_plotstring(10, 120, "Hallo", GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
 
-	glcd_puts("Hallo");
-
-	glcd_setcharsize(1, 1);
-
-	/* Wait for the screen to be (re)touched */
-	while (touchscreen_ispressed(touchscreen_pressure())) {}
-	while (!touchscreen_ispressed(touchscreen_pressure())) {}
 }
 #endif
