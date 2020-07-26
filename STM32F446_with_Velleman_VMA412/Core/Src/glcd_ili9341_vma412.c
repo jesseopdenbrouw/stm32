@@ -7,8 +7,8 @@
 
 Software License Agreement (BSD License)
 
-Version: 0.1rc2
-Date: 2020/07/23
+Version: 0.1rc3
+Date: 2020/07/26
 
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
@@ -115,8 +115,7 @@ static uint16_t glcd_sizex = 1;
 static uint16_t glcd_sizey = 1;
 
 /* Standard 5x8 font from AdaFruit */
-#ifdef GLCD_CHARCTERS_IN_RAM
-#else
+#ifndef GLCD_CHARCTERS_IN_RAM
 const
 #endif
 static uint8_t glcd_font[] = {
@@ -447,7 +446,7 @@ static uint32_t readdelay;
  * Delay routines needed for 8080 8/16/18 bit parallel interfaces
  */
 
-/* Function lcd_delay_init
+/* Function glcd_delay_init
  * Initializes the delay routine
  * @private
  * @in: void
@@ -548,7 +547,7 @@ static void glcd_delay_read(void) {
 /* Function glcd_set_write_pulse_delay
  * Sets the delay (width) of the write pulse
  * @public
- * @in: delay --> delay in 3 clock pulses
+ * @in: delay --> delay in 4 clock pulses
  * @out: void
  */
 void glcd_set_write_pulse_delay(uint32_t delay) {
@@ -558,7 +557,7 @@ void glcd_set_write_pulse_delay(uint32_t delay) {
 /* Function glcd_set_read_pulse_delay
  * Sets the delay (width) of the read pulse
  * @public
- * @in: delay --> delay in 3 clock pulses
+ * @in: delay --> delay in 4 clock pulses
  * @out: void
  */
 void glcd_set_read_pulse_delay(uint32_t delay) {
@@ -581,12 +580,12 @@ static void glcd_hardware_reset(void) {
 	  (GLCD_RST.pGPIO)->BSRR = (1<<(GLCD_RST.pin+16));
 
 	  /* Wait a bit */
-	  glcd_delay_ms(150);
+	  glcd_delay_ms(1);
 
 	  /* Set RST pin high */
 	  (GLCD_RST.pGPIO)->BSRR = (1<<(GLCD_RST.pin));
 
-	  /* Wait a bit */
+	  /* Wait a bit (> 120 ms) */
 	  glcd_delay_ms(150);
 }
 
@@ -678,7 +677,6 @@ void glcd_write_command(uint16_t cmd, glcd_cs_t what, glcd_dir_t dir) {
 	if (what == GLCD_CS_TO_HIGH || what == GLCD_CS_TOGGLE) {
 		(GLCD_CS.pGPIO)->BSRR = (1<<(GLCD_CS.pin));
 	}
-	/* Wait */
 
 	if (dir == GLCD_MAKE_DATA_INPUT) {
 		/* Data pins input */
@@ -885,7 +883,7 @@ void glcd_init(void) {
 	/* Initialize the delay routines */
 	glcd_delay_init();
 
-	/* Wait a bit for GLCD to fire up */
+	/* Wait a bit for GLCD to fire up after power on */
 	glcd_delay_ms(150);
 
 	/* Hard reset the GLCD */
@@ -945,13 +943,11 @@ void glcd_cls(glcd_color_t color) {
 	glcd_data[1] = 0x00;
 	glcd_data[2] = ((glcd_width-1)>>8)&0xff; //0x01;
 	glcd_data[3] = (glcd_width-1)&0xff; //0x3f;
-	//glcd_write(glcd_width>glcd_height ? 0x2a : 0x2b, 4, glcd_data);
 	glcd_write(0x2a, 4, glcd_data);
 
 	//0x2B, reset y position to full height
 	glcd_data[2] = ((glcd_height-1)>>8)&0xff; //0x00;
 	glcd_data[3] = (glcd_height-1)&0xff; //0xef;
-	//glcd_write(glcd_width<=glcd_height ? 0x2a : 0x2b, 4, glcd_data);
 	glcd_write(0x2b, 4, glcd_data);
 
 
@@ -1171,8 +1167,37 @@ void glcd_setcharsize(uint16_t x, uint16_t y) {
 	glcd_sizey = (y>0) ? y : 1;
 }
 
+/* Function glcd_setcharlayout
+ * Sets the font layout of a character
+ * @public
+ * @in: c  -- the character
+ * @in: byte0 -- the first byte of the layout
+ * @in: byte1 -- the second byte of the layout
+ * @in: byte2 -- the third byte of the layout
+ * @in: byte3 -- the fourth byte of the layout
+ * @in: byte4 -- the fifth byte of the layout
+ * @out: void
+ * Note: Note: characters must be in RAM
+ */
+void glcd_setcharlayout(uint16_t c, uint16_t byte0, uint16_t byte1, uint16_t byte2, uint16_t byte3, uint16_t byte4) {
+
+	uint8_t *pfont = glcd_font;
+
+	if (c>255) {
+		return;
+	}
+
+	pfont[c*5]   = byte0;
+	pfont[c*5+1] = byte1;
+	pfont[c*5+2] = byte2;
+	pfont[c*5+3] = byte3;
+	pfont[c*5+4] = byte4;
+}
+
+
+
 /* Function glcd_plotstring
- * Plots a string to the screen
+ * Plots a string to the display
  * @public
  * @in: x  -- the x coordinate
  * @in: y  -- the y coordinate
@@ -1284,6 +1309,18 @@ void glcd_plotrectrounded(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16
     glcd_plotcirclequarter(x + r, y + h - r - 1, r, GLCD_CORNER_LOWER_LEFT, color);
 }
 
+/* Function glcd_plotrectroundedfill
+ * Based on the AdaFruit library
+ * Plots a filled rectangle with rounded corners
+ * @public
+ * @in: x  -- the x coordinate
+ * @in: y  -- the y coordinate
+ * @in: w  -- width
+ * @in: h  -- height
+ * @in: r  -- the radius
+ * @in: color -- the RGB color specification
+ * @out: void
+ */
 void glcd_plotrectroundedfill(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t r, glcd_color_t color) {
 
 	int16_t max_radius = ((w < h) ? w : h) / 2; // 1/2 minor axis
@@ -1815,7 +1852,20 @@ void glcd_plottriangle(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint1
 	glcd_plotline(x3, y3, x1, y1, color);
 }
 
-void glcd_plottrianglefill(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, glcd_color_t color) {
+
+/* Taken from the AdaFruit library */
+/* Function glcd_trianglefill
+ * Plots a filled triangle on the GLCD
+ * @public
+ * @in: x1  -- x point 1
+ * @in: y1  -- y point 1
+ * @in: x2  -- x point 2
+ * @in: y2  -- y point 2
+ * @in: x3  -- x point 3
+ * @in: y3  -- y point 3
+ * @in: color -- the RGB color specification
+ * @out: void
+ */void glcd_plottrianglefill(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, glcd_color_t color) {
 
 	int16_t a, b, y, last;
 
@@ -2106,7 +2156,7 @@ inline uint16_t glcd_getheight(void) {
  * @out: the 24-bit color
  */
 glcd_color_t glcd_convertcolor(uint16_t color16) {
-	return ((color16 & 0xf800)<<13) |
-		   ((color16 & 0x07e0)<<11) |
-		   ((color16 & 0x001f));
+	return ((color16 & 0xf800)<<8) |
+		   ((color16 & 0x07e0)<<5) |
+		   ((color16 & 0x001f)<<3);
 }
