@@ -7,8 +7,8 @@
 
 Software License Agreement (BSD License)
 
-Version: 0.1rc2
-Date: 2020/07/23
+Version: 0.1rc3
+Date: 2020/07/26
 
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
@@ -52,7 +52,10 @@ POSSIBILITY OF SUCH DAMAGE.
 /* Really should be done by a function that reads the used ports */
 static const uint32_t TOUCH_GPIO_USED = 7;
 
-/* The Analog Channels using Arduino notation */
+/* The Analog Channels using Arduino notation
+ * Only works for ADC1 and ADC2, because ADC3 doesn't share
+ * PA4 and PB0 with ADC1/ADC2
+ */
 typedef struct {
 	GPIO_TypeDef *pGPIO; // One of GPIOA, GPIOB or GPIOC
 	uint32_t channel; // One of 1 .. 18
@@ -69,9 +72,6 @@ static const analogchannel_t analogchannels[] =
 	{GPIOC, 10, 0},    // Arduino ANA channel 5 == PC0
     {NULL,   0, 0}
 };
-
-#define YP analogchannels[2]
-#define XM analogchannels[3]
 
 /* The digital channels using Arduino notation */
 typedef struct {
@@ -100,15 +100,53 @@ static const digitalchannel_t digitalchannels[] =
     {NULL,   0, 0}
 };
 
-#define YM digitalchannels[8]
-#define XP digitalchannels[9]
-#define SD_CLK digitalchannel[13]
+/* Measured with VMA412 */
+#define XP analogchannels[3]   /* LCD_CS PB0 */
+#define XM digitalchannels[9]  /* LCD_D1 PC7 */
+#define YP digitalchannels[8]  /* LCD_D0 PA9 */
+#define YM analogchannels[2]   /* LCD_RS PA4 */
+
+//#define SD_CLK digitalchannel[13]
 
 /* The ADC to use */
 static ADC_TypeDef *pADC;
 /* Buffer for the samples */
 static uint32_t samples[TOUCH_SAMPLES];
 
+/* Delay before analog inputs have settled */
+
+static uint32_t readdelay;
+
+/* Function touchscreen_delay_init
+ * Initializes the delay routine
+ * @private
+ * @in: void
+ * @out: void
+ */
+static void touchscreen_delay_init(void) {
+	SystemCoreClockUpdate();
+	readdelay = 400UL*(SystemCoreClock/1000UL)/3000000UL+1UL;
+}
+
+/* Function touchscreen_delay_read
+ * Creates a delay for the GLCD read functions
+ * @private
+ * @in: none
+ * @out: void
+ */
+static void touchscreen_delay(void) {
+
+		uint32_t ns = readdelay;
+
+	    asm volatile ("mov r3, %[ns] \n\t"
+				  ".Lglcdhu%=: \n\t"
+				  "subs r3, #1 \n\t"
+				  "bne .Lglcdhu%= \n\t"
+                  :
+                  : [ns] "r" (ns)
+                  : "r3", "cc"
+				 );
+}
 
 /* Taken from the Adafruit library
  * Insertion sort is slow, but it doesn't use
@@ -147,6 +185,8 @@ static void touchscreen_insert_sort(uint32_t array[], uint16_t size) {
  */
 uint32_t touchscreen_init(ADC_TypeDef *used_ADC) {
 
+	touchscreen_delay_init();
+
 	pADC = used_ADC;
 
 	/* Enable IO port A, B, C Clocks */
@@ -164,12 +204,12 @@ uint32_t touchscreen_init(ADC_TypeDef *used_ADC) {
 	} else if (pADC == ADC2) {
 		RCC->APB2ENR |= (1<<RCC_APB2ENR_ADC2EN_Pos);
 #endif
-#ifdef ADC3
-    //ADC3 doesn't seem to work, TODO
-	} else if (pADC == ADC3) {
-		RCC->APB2ENR |= (1<<RCC_APB2ENR_ADC3EN_Pos);
-	} else {
-#endif
+/* ADC can't be used because two of the pins are not available on ADC3 */
+//#ifdef ADC3
+//	} else if (pADC == ADC3) {
+//		RCC->APB2ENR |= (1<<RCC_APB2ENR_ADC3EN_Pos);
+//	} else {
+//#endif
 		/* Unknown ADC */
 		pADC = NULL;
 		return 0;
@@ -237,7 +277,7 @@ void touchscreen_setadcspeed(uint32_t speed) {
  */
 uint32_t touchscreen_readrawx(void) {
 
-	uint32_t XMmoder, YPmoder;
+	uint32_t MODERA, MODERB, MODERC;
 
 	/* No ADC configured */
 	if (pADC == NULL) {
@@ -250,31 +290,34 @@ uint32_t touchscreen_readrawx(void) {
 	pADC->CR1 = (1 << ADC_CR1_RES_Pos);
 
 	/* Save directions */
-	YPmoder = (YP.pGPIO)->MODER;
-	XMmoder = (XM.pGPIO)->MODER;
+	MODERA = GPIOA->MODER;
+	MODERB = GPIOB->MODER;
+	MODERC = GPIOC->MODER;
 
 	/* Select Arduino compatible ADC Channel 0/1/2/... for ADCx */
-	pADC->SQR3 = (YP.channel << ADC_SQR3_SQ1_Pos);
+	pADC->SQR3 = (YM.channel << ADC_SQR3_SQ1_Pos);
 
-	/* YM is not used, set to input */
-	(YM.pGPIO)->MODER &= ~(3<<(YM.portbit<<1));
-	//(YM.pGPIO)->MODER |= (3<<(YM.portbit<<1));
+	/* YP is not used, set to input PA9 */
+	(YP.pGPIO)->MODER &= ~(3<<(YP.portbit<<1));
+	//(YP.pGPIO)->MODER |= (3<<(YP.portbit<<1));
 
 	/* Set the GPIO port/pin to Analog Function */
-	/* Use an bitwise OR PA4 */
-	(YP.pGPIO)->MODER &= ~(3<<(YP.portbit<<1));
-	(YP.pGPIO)->MODER |= (3<<(YP.portbit<<1));
+	//(YM.pGPIO)->MODER &= ~(3<<(YM.portbit<<1));
+	(YM.pGPIO)->MODER |= (3<<(YM.portbit<<1));
 
 
-	// XP is output, out is high PC7
+	// XP is output, out is high LCD_CS PB0 */
 	(XP.pGPIO)->MODER &= ~(3<<(XP.portbit<<1));
 	(XP.pGPIO)->MODER |= (1<<(XP.portbit<<1));
 	(XP.pGPIO)->BSRR   = (1<<(XP.portbit));
 
-	/* XM is output, out is low PB0*/
+	/* XM is output, out is low  LCD_D1 PC7 */
 	(XM.pGPIO)->MODER &= ~(3<<(XM.portbit<<1));
 	(XM.pGPIO)->MODER |= (1<<(XM.portbit<<1));
 	(XM.pGPIO)->BSRR   = (1<<(XM.portbit+16));
+
+	/* Wait a bit for analog inputs have stabilized */
+	touchscreen_delay();
 
 	for (int i=0; i <TOUCH_SAMPLES; i++) {
 		/* Start conversion */
@@ -287,12 +330,13 @@ uint32_t touchscreen_readrawx(void) {
 	}
 
 	/* Restore directions */
-	(XM.pGPIO)->MODER = XMmoder;
-	(YP.pGPIO)->MODER = YPmoder;
+	GPIOA->MODER = MODERA;
+	GPIOB->MODER = MODERB;
+	GPIOC->MODER = MODERC;
 
 	touchscreen_insert_sort(samples, TOUCH_SAMPLES);
 
-	return 1023 - samples[TOUCH_SAMPLES/2];
+	return samples[TOUCH_SAMPLES/2];
 }
 
 /* Function touchscreen_readrawy
@@ -303,7 +347,7 @@ uint32_t touchscreen_readrawx(void) {
  */
 uint32_t touchscreen_readrawy(void) {
 
-	uint32_t XMmoder, YPmoder;
+	uint32_t MODERA, MODERB, MODERC;
 
 	/* No ADC configured */
 	if (pADC == NULL) {
@@ -316,32 +360,36 @@ uint32_t touchscreen_readrawy(void) {
 	pADC->CR1 = (1 << ADC_CR1_RES_Pos);
 
 	/* Save directions */
-	YPmoder = (YP.pGPIO)->MODER;
-	XMmoder = (XM.pGPIO)->MODER;
+	MODERA = GPIOA->MODER;
+	MODERB = GPIOB->MODER;
+	MODERC = GPIOC->MODER;
 
 	/* Select Arduino compatible ADC Channel 0/1/2/... for ADCx */
-	pADC->SQR3 = (XM.channel << ADC_SQR3_SQ1_Pos);
+	pADC->SQR3 = (XP.channel << ADC_SQR3_SQ1_Pos);
 
-	/* XP is not used input PA9 */
-	(XP.pGPIO)->MODER &= ~(3<<(XP.portbit<<1));
-	(XP.pGPIO)->MODER |= (0<<(XP.portbit<<1));
+	/* XM is not used input PC7 */
+	(XM.pGPIO)->MODER &= ~(3<<(XM.portbit<<1));
+	//(XM.pGPIO)->MODER |= (0<<(XM.portbit<<1));
 
 	/* Set the GPIO port/pin to Analog Function */
-	/* Use an bitwise OR PA4 */
-	(XM.pGPIO)->MODER &= ~(3<<(XM.portbit<<1));
-	(XM.pGPIO)->MODER |= (3<<(XM.portbit<<1));
+	/* Use an bitwise OR PB0  */
+	//(XP.pGPIO)->MODER &= ~(3<<(XP.portbit<<1));
+	(XP.pGPIO)->MODER |= (3<<(XP.portbit<<1));
 
-	// YP is output, out is high PC7
+	// YP is output, out is high PA9
 	//(YP.pGPIO)->OSPEEDR |= (3<<(YP.portbit<<1));
 	(YP.pGPIO)->MODER &= ~(3<<(YP.portbit<<1));
 	(YP.pGPIO)->MODER |= (1<<(YP.portbit<<1));
 	(YP.pGPIO)->BSRR   = (1<<(YP.portbit));
 
-	/* YM is output, out is low PB0*/
+	/* YM is output, out is low PA4 */
 	//(YM.pGPIO)->OSPEEDR |= (3<<(YM.portbit<<1));
 	(YM.pGPIO)->MODER &= ~(3<<(YM.portbit<<1));
 	(YM.pGPIO)->MODER |= (1<<(YM.portbit<<1));
 	(YM.pGPIO)->BSRR   = (1<<(YM.portbit+16));
+
+	/* Wait a bit for analog inputs have stabilized */
+	touchscreen_delay();
 
 	for (int i=0; i <TOUCH_SAMPLES; i++) {
 		/* Start conversion */
@@ -354,13 +402,14 @@ uint32_t touchscreen_readrawy(void) {
 	}
 
 	/* Restore directions */
-	(XM.pGPIO)->MODER = XMmoder;
-	(YP.pGPIO)->MODER = YPmoder;
+	GPIOA->MODER = MODERA;
+	GPIOB->MODER = MODERB;
+	GPIOC->MODER = MODERC;
 
 	/* Find the mean of the array */
 	touchscreen_insert_sort(samples, TOUCH_SAMPLES);
 
-	return 1023 - samples[TOUCH_SAMPLES/2];
+	return samples[TOUCH_SAMPLES/2];
 }
 
 /* Function touchscreen_pressure
@@ -372,7 +421,7 @@ uint32_t touchscreen_readrawy(void) {
 uint32_t touchscreen_pressure(void) {
 
 	uint32_t p1, p2;
-	uint32_t XMmoder, YPmoder;
+	uint32_t MODERA, MODERB, MODERC;
 
 	/* No ADC configured */
 	if (pADC == NULL) {
@@ -385,62 +434,84 @@ uint32_t touchscreen_pressure(void) {
 	pADC->CR1 = (1 << ADC_CR1_RES_Pos);
 
 	/* Save directions */
-	YPmoder = (YP.pGPIO)->MODER;
-	XMmoder = (XM.pGPIO)->MODER;
+	MODERA = GPIOA->MODER;
+	MODERB = GPIOB->MODER;
+	MODERC = GPIOC->MODER;
 
-	/* XM is input  */
-	(XM.pGPIO)->MODER &= ~(3<<(XM.portbit<<1));
-	(XM.pGPIO)->MODER |= (3<<(XM.portbit<<1));
+	/* XP analog is input  */
+//	(XP.pGPIO)->MODER &= ~(3<<(XP.portbit<<1));
+	(XP.pGPIO)->MODER |= (3<<(XP.portbit<<1));
 
-	/* Set the GPIO port/pin to Analog Function */
-	/* Use an bitwise OR PA4 */
+	/* YM analog is input */
+//	(YM.pGPIO)->MODER &= ~(3<<(YM.portbit<<1));
+	(YM.pGPIO)->MODER |= (3<<(YM.portbit<<1));
+
+	// XM is output, out is high
 	(YP.pGPIO)->MODER &= ~(3<<(YP.portbit<<1));
-	(YP.pGPIO)->MODER |= (3<<(YP.portbit<<1));
+	(YP.pGPIO)->MODER |= (1<<(YP.portbit<<1));
+	(YP.pGPIO)->BSRR   = (1<<(YP.portbit));
 
-	// XP is output, out is high PC7
-	(XP.pGPIO)->MODER &= ~(3<<(XP.portbit<<1));
-	(XP.pGPIO)->MODER |= (1<<(XP.portbit<<1));
-	(XP.pGPIO)->BSRR   = (1<<(XP.portbit+16));
+	/* YP is output, out is low*/
+	(XM.pGPIO)->MODER &= ~(3<<(XM.portbit<<1));
+	(XM.pGPIO)->MODER |= (1<<(XM.portbit<<1));
+	(XM.pGPIO)->BSRR   = (1<<(XM.portbit+16));
 
-	/* YM is output, out is low PB0*/
-	(YM.pGPIO)->MODER &= ~(3<<(YM.portbit<<1));
-	(YM.pGPIO)->MODER |= (1<<(YM.portbit<<1));
-	(YM.pGPIO)->BSRR   = (1<<(YM.portbit));
+	/* Wait a bit for analog inputs have stabilized */
+	touchscreen_delay();
 
-	/* Select Arduino compatible ADC Channel 0/1/2/... for ADCx */
-	pADC->SQR3 = (XM.channel << ADC_SQR3_SQ1_Pos);
-
-	/* Start conversion */
-	pADC->CR2 |= (1<<ADC_CR2_SWSTART_Pos);
-
-	/* Wait for conversion complete */
-	while ((pADC->SR & (1<<ADC_SR_EOC_Pos)) == 0);
-
-	p1 = pADC->DR;
-
-	/* Select Arduino compatible ADC Channel 0/1/2/... for ADCx */
-	pADC->SQR3 = (YP.channel << ADC_SQR3_SQ1_Pos);
+	/* Read XP first */
+	pADC->SQR3 = (XP.channel << ADC_SQR3_SQ1_Pos);
 
 	/* Start conversion */
-	pADC->CR2 |= (1<<ADC_CR2_SWSTART_Pos);
+	for (int i=0; i <TOUCH_SAMPLES; i++) {
+		/* Start conversion */
+		pADC->CR2 |= (1<<ADC_CR2_SWSTART_Pos);
 
-	/* Wait for conversion complete */
-	while ((pADC->SR & (1<<ADC_SR_EOC_Pos)) == 0);
+		/* Wait for conversion complete */
+		while ((pADC->SR & (1<<ADC_SR_EOC_Pos)) == 0);
 
-	p2 = pADC->DR;
+		samples[i] = pADC->DR;
+	}
+
+	/* Sort the readings */
+	touchscreen_insert_sort(samples, TOUCH_SAMPLES);
+
+	/* Take the mean */
+	p1 = samples[TOUCH_SAMPLES/2];
+
+
+	/* Now read YM */
+	pADC->SQR3 = (YM.channel << ADC_SQR3_SQ1_Pos);
+
+	/* Start conversion */
+	for (int i=0; i <TOUCH_SAMPLES; i++) {
+		/* Start conversion */
+		pADC->CR2 |= (1<<ADC_CR2_SWSTART_Pos);
+
+		/* Wait for conversion complete */
+		while ((pADC->SR & (1<<ADC_SR_EOC_Pos)) == 0);
+
+		samples[i] = pADC->DR;
+	}
+
+	/* Sort the readings */
+	touchscreen_insert_sort(samples, TOUCH_SAMPLES);
+
+	/* Take the mean */
+	p2 = samples[TOUCH_SAMPLES/2];
 
 	/* Restore directions */
-	(XM.pGPIO)->MODER = XMmoder;
-	(YP.pGPIO)->MODER = YPmoder;
+	GPIOA->MODER = MODERA;
+	GPIOB->MODER = MODERB;
+	GPIOC->MODER = MODERC;
 
-	if (p2<p1) {
-		return 1023-(p1-p2);
-	}
-	return 1023-(p2 - p1);
+//	if (p2<p1) {
+//		return 1023-(p1-p2);
+//	}
+	return 1023 - (p2 - p1);
 }
 
-/* Function touchscreen_map
- * Maps raw touchscreen value to a screen value
+/* Maps raw touchscreen value to a screen value
  * @public
  * @in: value --> the raw value
  * @in: tlow  --> touchscreen raw lowest value
