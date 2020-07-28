@@ -74,7 +74,7 @@ POSSIBILITY OF SUCH DAMAGE.
 /* Let's see if we can plot an 256-color indexed picture */
 #define HAVE_WOOF
 
-/* For testing purposes */
+/* For testing purposes, if you know what your're doing */
 //#define USE_TEST
 
 
@@ -471,10 +471,18 @@ void demo_glcd(void) {
 	glcd_plotstring(0,40, "Hallo Kirsten, hoe is het met jou?\x01\x02\x03\x04", GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
 	glcd_plotstring(0,48, "Hallo Kirsten, hoe is het met jou?\x01\x02\x03\x04", GLCD_COLOR_YELLOW, GLCD_COLOR_YELLOW, GLCD_STRING_WIDE);
 
+	glcd_setcharsize(2, 2);
+	glcd_plotstring(0,68, "Big", GLCD_COLOR_YELLOW, GLCD_COLOR_YELLOW, GLCD_STRING_WIDE);
+
+	glcd_setcharsize(2, 2);
+	glcd_plotstring(0,98, "Bigger", GLCD_COLOR_YELLOW, GLCD_COLOR_YELLOW, GLCD_STRING_WIDE);
+
+	glcd_setcharsize(1, 1);
+
 	/* Plot the complete character table */
 	for (i=0; i<8; i++) {
 		for (j=0; j<32; j++) {
-			glcd_plotchar( 10+j*6, 120+i*9, i*32+j, GLCD_COLOR_YELLOW, GLCD_COLOR_YELLOW);
+			glcd_plotchar( 10+j*6, 150+i*9, i*32+j, GLCD_COLOR_YELLOW, GLCD_COLOR_YELLOW);
 		}
 	}
 
