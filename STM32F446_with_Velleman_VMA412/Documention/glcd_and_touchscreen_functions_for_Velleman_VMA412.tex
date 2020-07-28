@@ -42,6 +42,8 @@
 
 \usepackage{hyperref}
 
+\usepackage{booktabs}
+
 \lstset{
     language=C,
     basicstyle=\small\ttfamily,
@@ -67,7 +69,7 @@ The library is written in C and consists of four driver files and one C test fil
 
 Library functions include plotting a pixel, rectangles, circles, arcs, printing strings, rotating displays and filling an object, and reading X, Y and pressure values. It also has primitive console based printing functions.
 
-The library uses 18-bit colors where each color has 6 bits used.
+The library uses 18-bit colors where each color has 6 bits used. 16-bit color information is supported by a conversion function.
 
 The library is tested using a STM32F446 Nucleo board and STMCubeIDE version 1.3.1.
 
@@ -444,7 +446,7 @@ void glcd_plotchar(uint16_t x,             // x coordinate
                    glcd_color_t bg);       // background color
 \end{lstlisting}
 
-Note: character is one of 0 -- 255 (no special C treatment)..\\
+Note: character is one of 0 -- 255 (no special C treatment).\\
 Note: if \lstinline|color| is equal to \lstinline|bg| then pixels having background color are not printed.
 
 \subsubsection{Plot a string using buildin font}
@@ -483,7 +485,7 @@ void glcd_setcharlayout(uint16_t c,       // the character
 
 Note: the character table has to be in RAM. See $\S$~\ref{sec:glcdtaylor}.\\
 Note: \lstinline|c| must be 0 -- 255.\\
-Note: charaters of the internal font take up 5x8 pixels. Each byte specifies one column of 8 pixels. The first byte specifies the left most column. Subsequent bytes specify column to the right of the previous one. The LSB of the bytes specify the top most pixel of a column. The MSB of the bytes specify the bottom most pixel. A one bit specifies a pixel to be drawn in foreground color, a zero bit specifies a pixel to be drawn in background color.
+Note: charaters of the internal font take up 5x8 pixels. Each byte specifies one column of 8 pixels. The first byte specifies the left most column. Subsequent bytes specify columns to the left of the previous one. The LSB of the bytes specify the top most pixel of a column. The MSB of the bytes specify the bottom most pixel. A one bit specifies a pixel to be drawn in foreground color, a zero bit specifies a pixel to be drawn in background color.
 
 
 \subsubsection{Plot a rectangle}
@@ -594,22 +596,6 @@ Notes \lstinline|delta| is the squeeze factor, positive squeezes left/right, neg
 Note: \lstinline|corners| is one of \lstinline|GLCD_CORNER_LEFT_HALF|, \lstinline|GLCD_CORNER_RIGHT_HALF| and\\ \lstinline|GLCD_CORNER_BOTH|.\\
 Note: doesn't plot the outer top-to-bottom vertical line. 
 
-
-\subsubsection{Plot an arc}
-\ifunc{glcd\_plotarc}
-To plot an arc, use:
-\begin{lstlisting}
-void glcd_plotarc(uint16_t xc,                // center x coordinate
-                  uint16_t yc,                // center y coordinate
-                  uint16_t r,                 // radius
-                  float start,                // start angle in degrees
-                  float stop,                 // stop angle in degrees
-                  glcd_color_t color);        // color
-\end{lstlisting}
-
-Note: this function is only available if \lstinline|GLCD_USE_ARC| is defined.\\
-Note: this function uses \lstinline|sinf| and \lstinline|cosf| math functions, using the onboard FPU.
-
 \subsubsection{Plot a triangle}
 \ifunc{glcd\_plottriangle}
 To plot a triangle, use:
@@ -638,6 +624,57 @@ void glcd_plottrianglefill(uint16_t x0,           // first x
                            glcd_color_t color);   // color
 
 \end{lstlisting}
+
+\subsubsection{Plot a regular polygon}
+\label{sec:regpoly}
+\ifunc{glcd\_plotregularpolygon}
+To plot a regular polygon, with evenly spaced sides, use
+
+\begin{lstlisting}
+void glcd_plotregularpolygon(uint16_t xc,           // center x
+                             uint16_t yc,           // center y
+                             uint16_t r,            // radius
+                             uint16_t sides,        // number of sides
+                             float displ,           // angle displacement
+                             glcd_color_t color);   // color
+\end{lstlisting}
+
+Note: \lstinline|displ| is angle displacement from the positive x axis downwards.\\
+Note: if \lstinline|sides| is 0, nothing is plotted.\\
+Note: if \lstinline|sides| is 1, a point is plotted on (xc + r$\cdot$cos(angle), yx+r$\cdot$cos(angle)).\\
+Note: if \lstinline|sides| is 2, a line is plotted between (xc + r$\cdot$cos(angle), yx+r$\cdot$cos(angle)) and (xc + r$\cdot$cos($\pi$+angle), yx+r$\cdot$cos($\pi$+angle)).
+
+\subsubsection{Plot a filled regular polygon}
+\ifunc{glcd\_plotregularpolygonfill}
+To plot a filled regular polygon, with evenly spaced sides, use
+
+\begin{lstlisting}
+void glcd_plotregularpolygonfill(uint16_t xc,           // center x
+                                 uint16_t yc,           // center y
+                                 uint16_t r,            // radius
+                                 uint16_t sides,        // number of sides
+                                 float displ,           // angle displacement
+                                 glcd_color_t color);   // color
+\end{lstlisting}
+
+Note: see $\S$~\ref{sec:regpoly}.\\
+Note: this function uses the filled triangle function to do its job.
+
+\subsubsection{Plot an arc}\textbf{}
+\ifunc{glcd\_plotarc}
+To plot an arc, use:
+\begin{lstlisting}
+void glcd_plotarc(uint16_t xc,                // center x coordinate
+                  uint16_t yc,                // center y coordinate
+                  uint16_t r,                 // radius
+                  float start,                // start angle in degrees
+                  float stop,                 // stop angle in degrees
+                  glcd_color_t color);        // color
+\end{lstlisting}
+
+Note: this function is only available if \lstinline|GLCD_USE_ARC| is defined.\\
+Note: this function uses \lstinline|sinf| and \lstinline|cosf| math functions, using the onboard FPU.
+
 \subsubsection{Plot a 2-color bitmap}
 \ifunc{glcd\_plotbitmap}
 To plot a 2-color bitmap, use:
@@ -791,7 +828,7 @@ uint16_t glcd_getheight(void);
 \subsubsection{Converting 16 bit colors}
 \ifunc{glcd\_convertcolor}
 \label{sec:convertcolors}
-To convert 16 bit standard colors to 24-bit colors, use:
+To convert 16 bit standard (5/6/5) colors to 24-bit colors, use:
 
 \begin{lstlisting}
 glcd_color_t glcd_convertcolor(uint16_t color16)
@@ -916,22 +953,22 @@ Note: this function internally uses floats to do the calculations. This will be 
 The map function corresponds to the linear equation:
 
 \begin{equation}
-returned\ value = a\cdot value + b
+returned = slope\cdot value + offset
 \end{equation}
 
-where $a$ is
+where $slope$ is
 
 \begin{equation}
-a = \frac{shigh-slow}{thigh-tlow}\qquad\qquad(thigh \neq tlow)
+slope = \frac{shigh-slow}{thigh-tlow}\qquad\qquad(thigh \neq tlow)
 \end{equation}
 
-and $b$ is
+and $offset$ is
 
 \begin{equation}
-b = - a\cdot tlow;
+offset = \frac{slow(thigh-tlow)-tlow}{thigh-tlow}
 \end{equation}
 
-Note: if $thigh = tlow$ the value \lstinline|INT_MIN| is returned.
+Note: if $thigh = tlow$ the value \lstinline|INT_MIN| is returned, because division by 0 is not possible.
 
 \subsection{Touchscreen high level functions}
 
@@ -1114,12 +1151,49 @@ The SD-card interface needs a complete layer of functions to manipulate the SD-c
 The VMA412 uses 13 pins to do its job. Nearly all of the Arduino compatible pins are used. Only Arduino pin A5 if free, as are digital pins 10 through 13 (for the SD-card functions). But of course you can use the remaining pins on the Morpho connectors.
 
 
-\section{Gory details: GLCD timing diagrams}
-For those of you love timing diagrams with hardware, here are some snapshots of the timing for writing one pixel and reading a pixel. If you know how to handle an oscilloscope, you can easily reproduce the next figures. The figures are produced with a Tektronic DPO2004B Digital Oscilloscope, which has four channels available.
+\section{Some details}
+In this section some details about the functioning of the VMA412 are discussed. It gives you some information is you want to experiment yourself.
+
+The VMA412 uses the ILI9431's 8-bit databus connection, which is called the 8080 type I connection. This is a reference to the old days, when the much-used Intel 8080 microprocessor was used. The VMA12 needs 8 pins for data exchange. There are 5 additions pins needed to guide the information exchange. They are: RST, (hardware reset, active low), CS (chip select, active low), data/command (D/C, bi-valued), write (WR, active low) and RD (read, active low). See Table~\ref{tab:1}. In this table the touchscreen pins are also shown.
+
+
+\begin{table}[!ht]
+\centering
+\caption{Pins with VMA412, ILI9341, STM32, Arduino and touchscreen based names.}
+\label{tab:1}
+\begin{tabular}{p{2.5cm}p{2.5cm}p{2.5cm}p{2.5cm}p{2.5cm}}
+\toprule
+VMA412 & ILI9341 & STM32 & Arduino & Touchscreen \\
+\midrule
+LCD\_RST & RESX & PC1    & A4 & -- \\
+LCD\_CS  & CSX  & PB0    & A3 & XP \\
+LCD\_RS  & D/CX & PA4    & A2 & YM \\
+LCD\_WR  & WRX  & PA1    & A1 & -- \\
+LCD\_RD  & RDX  & PA0    & A0 & -- \\[.8ex]
+LCD\_D7  & D[7] & PA8    & 7  & -- \\
+LCD\_D6  & D[6] & PB10   & 6  & -- \\
+LCD\_D5  & D[5] & PB4    & 5  & -- \\
+LCD\_D4  & D[4] & PB5    & 4  & -- \\
+LCD\_D3  & D[3] & PB3    & 3  & -- \\
+LCD\_D2  & D[2] & PA10   & 2  & -- \\
+LCD\_D1  & D[1] & PC7    & 9  & XM \\
+LCD\_D0  & D[0] & PA9    & 8  & YP \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The D/C signal is called RS (register select) in VMA412  speak. It is a bi-valued signal. When low (0) is signals the ILI9341 a command is send, when high (1) data is read or written.
+Not shown in this table are the four signal for accessing SD-cards. This library doesn't support SD-card accesses.
+Note that pins PA2 and PA3 are not used so it is possible to use USART2 for serial communication.
+
+Note: because the CS pin is used in touchscreen reading, the WR and RD pins have to be high.
+
+\subsection{GLCD timing diagrams}
+For those of you love timing diagrams with hardware, here are some snapshots of the timing for writing one pixel and reading a pixel. If you know how to handle an oscilloscope, you can easily reproduce the next figures. The figures are produced with a Tektronic DPO2004B Digital Oscilloscope, which has four channels available, up to 70 MHz.
 
 For each of the following figures, the Chip Select line (CS) is in yellow, the C/D line (command/data) is in blue, the Write line (WR) is in purple and the Read line (RD) is in green. Before the ILI9431 responds to any information the CS line must be made low.
 
-\subsection{Writing one pixel to the display}
+\subsubsection{Writing one pixel to the display}
 Writing one pixel to the screen, including a write terminate, takes about 10 $\mu$s (microseconds). The CS-line is low for 9.7 $\mu$s but there is some overhead in calling the function and setting up the datalines. The screenshot is shown if Figure~\ref{fig:10}.
 
 \begin{figure}[!ht]
@@ -1134,7 +1208,7 @@ First there are five bytes written to set the X coordinate, then there are five 
 
 Because writing a pixel takes about 10 $\mu$s, you can write about 100000 pixels per second.
 
-\subsection{Reading pixel data from the display}
+\subsubsection{Reading pixel data from the display}
 Reading a pixel is started by writing the pixel coordinate. After that, four bytes are read. The first byte read in is useless information, and the next three bytes are the color information in red, green and blue. After that, a read terminate is issued.
 
 \begin{figure}[!ht]
@@ -1144,7 +1218,7 @@ Reading a pixel is started by writing the pixel coordinate. After that, four byt
 \label{fig:11}
 \end{figure}
 
-\subsection{Write and read pulse delay}
+\subsubsection{Write and read pulse delay}
 Please note that reading informations takes up more time that writing information. This is because the write and write pulse width need to be different. For a write the pulse width has to be 66 ns and for a read the pulse has to be 450 ns. Figure~\ref{fig:12} shows the difference.
 
 \begin{figure}[!ht]
@@ -1156,17 +1230,58 @@ Please note that reading informations takes up more time that writing informatio
 
 In this setup, the write pulse delay is about 96 ns and the read pulse delay is about 620 ns, so there is some room for speeding up the write and read. This is because the automatic calculations of the delays is somewhat pessimistic \textsl{and} writing and reading the individual the individual data and control signals takes some time. If you want to experiment with the pulse widths, please see $\S$~\ref{sec:writedelay} and $\S$~\ref{sec:readdelay}, but you may wind up with a non-responsive display. If this happens, just restore the original values and you'll be fine.
 
+
+\subsection{Touchscreen timing diagrams}
+The touchscreen is constructed with resistive foils, commenly named \textsl{plates}. As seen from the VMA412, the widest plate is called the x plate and de smaller plate is called the y plate. Because Arduino based software rotates the display 90$^\circ$ counter clockwise, x and y are swapped on these platforms.
+
+Reading the x and y touched positions involves activating the plate to be read and then sample an analog voltage which indicates the point of touching. This is in electronic science called a \textsl{voltage divider}.
+
+\subsubsection{Reading raw x}
+To read the raw x position, XP is set high (about~3.3~V) and XM is set low (0~V). Then the voltage is read from YM. A low (digital) value indicates that the point of touching is more on the left (as positioned on the STM32) and a high (digital) value indicates that the point of touching is on the right. This value is an \textsl{indication} of where the plate is touched so you have to calculate the real display x coordinate. A sample of reading the raw x value is shown in Figure~\ref{fig:21}. Reading the raw X value takes about 30 $\mu$s because it is sampled 16 times (default) and the the mean of the samples is returned as digital value. Not that the mean is \textsl{not} the same as the average.
+
+\begin{figure}[!ht]
+\centering
+\includegraphics[width=0.8\textwidth]{sample_x}
+\caption{Reading raw x.}
+\label{fig:21}
+\end{figure}
+
+\subsubsection{Reading raw y}
+Reading the raw y value is identical but now YP is set high, XM is set low and the analog voltage is read from XP. This is shown in Figure~\ref{fig:22}. Reading the raw y value also takes up about 30 $\mu$s.
+
+\begin{figure}[!ht]
+\centering
+\includegraphics[width=0.8\textwidth]{sample_y}
+\caption{Reading raw y.}
+\label{fig:22}
+\end{figure}
+
+
+\subsubsection{Reading pressure}
+Reading the pressure is more tricky, because there no plate for reading this value. Because of this the x and y plate are wired up together to get an indication of the pressure, and it is not possible to read the pressure accurately. For reading the pressure, XM is set high, YP is set low, and the pressure indication is read from both XP and YM. The \textsl{difference} of XP and YM is an indication of pressure. In Figure~\ref{fig:26}, a complete reading of pressure, raw x and and raw y is shown. Reading the pressure involves reading two analog values and takes up 60 $\mu$s. This means that a complete reading of pressure, raw x and raw y takes up 120 $\mu$s.
+
+\begin{figure}[!ht]
+\centering
+\includegraphics[width=0.8\textwidth]{sample_pressure_x_y}
+\caption{Reading pressure, raw x and\textbf{} raw y in sequence.}
+\label{fig:26}
+\end{figure}
+
+Because of the analog circuitry, after setting up the voltage across a plate, the analog inputs have to stabilize for about 400 to 800 ns. This is done automatically by the library.
+
+When the raw values have read in from the analog inputs, you have to map these values to display coordinates. This is done by the function \lstinline|touchscreen_map|. First you have to figure out the minimum and maximum of the raw x and y values. The values have to be assigned to \lstinline|TOUCH_LEFT|, \lstinline|TOUCH_RIGHT|, \lstinline|TOUCH_TOP| and \lstinline|TOUCH_BOTTOM|. For deciding if the touchscreen is pressed you have to assign \lstinline|TOUCH_PRESSURE_LOW| and \lstinline|TOUCH_PRESSURE_HIGH|. A value below \lstinline|TOUCH_PRESSURE_LOW| or above \lstinline|TOUCHS_PRESSURE_HIGH| is considered that the touchscreen is not pressed. The default values will suffice for most VMA412's.
+
 \section{Todo's}
 Some todo's left:
 
 \begin{itemize}
-\item Regular polygon plot function, with displacement angle;
-\item Exchange display top/bottom and left/right;
+%\item Regular polygon plot function, with displacement angle;
+\item Exchange display top/bottom or left/right (not rotating);
 \item Make C++ wrappers;
-\item Make C++ wrappers for AdaFruit based software (mostly Arduino sketches). This should minimize porting Arduino based software. One problem is that some functions are currently not implemented in this library. This will be a separate project;
+\item Make C++ wrappers for AdaFruit based software (mostly Arduino sketches). This will be a separate project. This should minimize porting Arduino based software. One problem is that some functions are currently not implemented in this library. Also the Arduino based software rotates the display 90$^\circ$ with respect to this library, and swap X and Y reading from the touchscreen.
 \item High-level touchscreen X and Y read functions (needs rotation information);
 %\item Calculation of raw touchscreen X and pressure with \lstinline|rx_plate| set to non-standard value.
-\item More gory details on reading the touchscreen;
+%\item More gory details on reading the touchscreen;
 \end{itemize}
 
 %% Add index to toc with clickable reference
