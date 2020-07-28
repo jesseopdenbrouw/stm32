@@ -511,6 +511,7 @@ uint32_t touchscreen_pressure(void) {
 	return 1023 - (p2 - p1);
 }
 
+/* Taken from to Arduino library, uses floats */
 /* Maps raw touchscreen value to a screen value
  * @public
  * @in: value --> the raw value
@@ -531,6 +532,10 @@ int32_t touchscreen_map(uint32_t value, uint32_t tlow, uint32_t thigh, uint32_t 
 		start = - slope*(float)tlow;
 		return slope*value + start;
 	}
+
+//	if (thigh != tlow) {
+//		return ((float)value - (float)(tlow))*((float)shigh - (float)slow) / ((float)thigh - (float)tlow) + (float)slow + (float)0.5f;
+//	}
 
 	/* If thigh == tlow, we divide by 0 and that is not possible */
 	return INT_MIN;
