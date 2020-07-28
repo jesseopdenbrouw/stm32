@@ -7,8 +7,8 @@
 
 Software License Agreement (BSD License)
 
-Version: 0.1rc3
-Date: 2020/07/26
+Version: 0.1rc4
+Date: 2020/07/27
 
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
@@ -75,7 +75,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #define HAVE_WOOF
 
 /* For testing purposes */
-#define USE_TEST
+//#define USE_TEST
 
 
 #ifdef MEASUREMENT
@@ -733,27 +733,44 @@ void demo_characterset(void) {
 #ifdef USE_TEST
 void test(void) {
 
-	char buffer[40];
-	volatile uint32_t x, y, p=0;
+//	char buffer[40];
+//	volatile uint32_t x, y, p=0;
+//	volatile int32_t xc, yc;
+	glcd_color_t color = GLCD_COLOR_YELLOW;
 
-	glcd_cls(GLCD_COLOR_RED);
+	//glcd_setrotation(GLCD_SCREEN_ROT90);
 
+//		glcd_cls(GLCD_COLOR_RED);
+//
 	glcd_puts("\f");
-	glcd_puts("Halllo 123\n");
-	glcd_terminate_write();
+//	glcd_puts("Halllo 123\n");
+//
+//	glcd_plotrect(100, 100, 150, 130, GLCD_COLOR_RED);
+//	glcd_terminate_write();
+
+	for (int i = 0; i <10; i++) {
+		glcd_plotregularpolygonfill(160, 120, 100, 10, i*36, color);
+		color += 0x100000;
+	}
 
 	while (1) {
+//
+//		p = touchscreen_pressure();
+//
+//		x  = touchscreen_readrawx();
+//		xc = touchscreen_map(x, TOUCH_LEFT, TOUCH_RIGHT, 0, glcd_getwidth());
+//		y = touchscreen_readrawy();
+//		yc = touchscreen_map(y, TOUCH_BOTTOM, TOUCH_TOP, 0, glcd_getheight());
+//
+////		snprintf(buffer, sizeof buffer, "x = %4lu, y = %4lu, %4lu\r", x, y, p);
+////		glcd_puts(buffer);
+//		snprintf(buffer, sizeof buffer, "x = %4ld, y = %4ld, %4lu\r", xc, yc, p);
+//		glcd_puts(buffer);
+////		glcd_plotpixel(100, 100, GLCD_COLOR_YELLOW);
+////		glcd_terminate_write();
+//		glcd_delay_ms(1);
 
-		p = touchscreen_pressure();
 
-		x = touchscreen_readrawx();
-		y = touchscreen_readrawy();
-
-		snprintf(buffer, sizeof buffer, "x = %4lu, y = %4lu, %4lu\r", x, y, p);
-		glcd_puts(buffer);
-//		glcd_plotpixel(100, 100, GLCD_COLOR_YELLOW);
-		glcd_terminate_write();
-		glcd_delay_ms(1);
 	}
 
 
