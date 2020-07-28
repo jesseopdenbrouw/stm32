@@ -7,8 +7,8 @@
 
 Software License Agreement (BSD License)
 
-Version: 0.1rc3
-Date: 2020/07/26
+Version: 0.1rc4
+Date: 2020/07/27
 
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
@@ -51,7 +51,7 @@ extern "C"
 #include "main.h"
 
 /* Driver version */
-#define TOUCH_VERSION "STM32 VMA412 TS Driver v 0.1rc3 (Jul 26 2020)"
+#define TOUCH_VERSION "STM32 VMA412 TS Driver v 0.1rc4 (Jul 27 2020)"
 
 /* Calibrate the touchscreen */
 #define TOUCH_LEFT 120
@@ -61,7 +61,7 @@ extern "C"
 #define TOUCH_PRESSURE_LOW 150
 #define TOUCH_PRESSURE_HIGH 1000
 
-/* Number of samples to take for x and y */
+/* Number of samples to take for x, y and pressure */
 #define TOUCH_SAMPLES 16
 
 /* Initialize touchscreen hardware, select the ADC */
