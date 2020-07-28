@@ -7,8 +7,8 @@
 
 Software License Agreement (BSD License)
 
-Version: 0.1rc3
-Date: 2020/07/26
+Version: 0.1rc4
+Date: 2020/07/27
 
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
@@ -430,6 +430,12 @@ static const uint8_t glcd_hhs_small_map[] = {
 };
 #endif
 
+
+/*
+ * Delay routines needed for 8080 8/16/18 bit parallel interfaces
+ */
+
+
 /* Variable prems -- prescaler ms
  *          preus -- prescaler us
  *          writedelay -- #loops for writes
@@ -440,11 +446,6 @@ static uint32_t prems;
 static uint32_t preus;
 static uint32_t writedelay;
 static uint32_t readdelay;
-
-
-/*
- * Delay routines needed for 8080 8/16/18 bit parallel interfaces
- */
 
 /* Function glcd_delay_init
  * Initializes the delay routine
@@ -569,6 +570,10 @@ void glcd_set_read_pulse_delay(uint32_t delay) {
  */
 
 
+/*
+ * Hardware initiate functions
+ */
+
 /* Function glcd_reset
  * Generates a hardware reset of the GLCD
  * @private
@@ -633,6 +638,46 @@ static void glcd_hardware_init(void) {
 	/* Set WR pin high */
 	(GLCD_WR.pGPIO)->BSRR = (1<<(GLCD_WR.pin));
 }
+
+/* Function glcd_init
+ * Initializes the GLCD
+ * @public
+ * @in: void
+ * @out: void
+ */
+void glcd_init(void) {
+	uint16_t init_table_size = sizeof(ILI9341_regValues_stm32) / sizeof(ILI9341_regValues_stm32[0]);
+	uint16_t i;
+
+	/* Initialize the delay routines */
+	glcd_delay_init();
+
+	/* Wait a bit for GLCD to fire up after power on */
+	glcd_delay_ms(150);
+
+	/* Hard reset the GLCD */
+	glcd_hardware_reset();
+	/* Initialize control pins, not the data pins, because they can be used for input or output */
+	glcd_hardware_init();
+
+	/* Setup the GLCD */
+	i=0;
+	while (i < init_table_size) {
+		if (ILI9341_regValues_stm32[i] == GLCD_DELAY) {
+			glcd_delay_ms(ILI9341_regValues_stm32[i+1]);
+			i=i+2;
+		} else {
+			/*         command                     length                        start point */
+			glcd_write(ILI9341_regValues_stm32[i], ILI9341_regValues_stm32[i+1], &ILI9341_regValues_stm32[i+2]);
+			i = i+ILI9341_regValues_stm32[i+1]+2;
+		}
+	}
+}
+
+
+/*
+ * Low level functions for reading from and writing to display
+ */
 
 /* Function glcd_write_command
  * Writes a command to the GLCD
@@ -870,45 +915,12 @@ void glcd_terminate_write(void) {
 	glcd_write_command(0x00, GLCD_CS_TO_HIGH, GLCD_KEEP_DATA_OUTPUT);
 }
 
-/* Function glcd_init
- * Initializes the GLCD
- * @public
- * @in: void
- * @out: void
- */
-void glcd_init(void) {
-	uint16_t init_table_size = sizeof(ILI9341_regValues_stm32) / sizeof(ILI9341_regValues_stm32[0]);
-	uint16_t i;
-
-	/* Initialize the delay routines */
-	glcd_delay_init();
-
-	/* Wait a bit for GLCD to fire up after power on */
-	glcd_delay_ms(150);
-
-	/* Hard reset the GLCD */
-	glcd_hardware_reset();
-	/* Initialize control pins, not the data pins, because they can be used for input or output */
-	glcd_hardware_init();
-
-	/* Setup the GLCD */
-	i=0;
-	while (i < init_table_size) {
-		if (ILI9341_regValues_stm32[i] == GLCD_DELAY) {
-			glcd_delay_ms(ILI9341_regValues_stm32[i+1]);
-			i=i+2;
-		} else {
-			/*         command                     length                        start point */
-			glcd_write(ILI9341_regValues_stm32[i], ILI9341_regValues_stm32[i+1], &ILI9341_regValues_stm32[i+2]);
-			i = i+ILI9341_regValues_stm32[i+1]+2;
-		}
-	}
-}
-
 
 /*
  * High level interface routines
  */
+
+
 /* Function glcd_setrotation
  * Sets the rotation of the screen
  * @public
@@ -1043,7 +1055,7 @@ glcd_color_t glcd_readpixel(uint16_t x, uint16_t y) {
 void glcd_plothorizontalline(uint16_t x, uint16_t y, uint16_t w, glcd_color_t color) {
 
 	register uint16_t i;
-	register uint16_t red, green, blue;
+	register glcd_buffer_t red, green, blue;
 
 	red   = (color>>16)&0xff;
 	green = (color>>8)&0xff;
@@ -1085,7 +1097,13 @@ void glcd_plothorizontalline(uint16_t x, uint16_t y, uint16_t w, glcd_color_t co
  * @out: void
  */
 void glcd_plotverticalline(uint16_t x, uint16_t y, uint16_t h, glcd_color_t color) {
+
 	register uint16_t i;
+	register glcd_buffer_t red, green, blue;
+
+	red   = (color>>16)&0xff;
+	green = (color>>8)&0xff;
+	blue  = (color>>0)&0xff;
 
 	//0x2A, x position
 	// Make x position one pixel wide, so it will print vertical
@@ -1107,9 +1125,9 @@ void glcd_plotverticalline(uint16_t x, uint16_t y, uint16_t h, glcd_color_t colo
 	}
 	/* Create color */
 	for (i=0; i<3*h; i=i+3) {
-		glcd_data[i] = (color>>16)&0xff;
-		glcd_data[i+1] = (color>>8)&0xff;
-		glcd_data[i+2] = (color>>0)&0xff;
+		glcd_data[i] = red;
+		glcd_data[i+1] = green;
+		glcd_data[i+2] = blue;
 	}
 	glcd_write(0x2c, 3*h, glcd_data);
 }
@@ -1324,9 +1342,10 @@ void glcd_plotrectrounded(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16
 void glcd_plotrectroundedfill(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t r, glcd_color_t color) {
 
 	int16_t max_radius = ((w < h) ? w : h) / 2; // 1/2 minor axis
-    if (r > max_radius)
-      r = max_radius;
-    // smarter version
+    if (r > max_radius) {
+    	r = max_radius;
+    }
+
     glcd_plotrectfill(x + r, y, w - 2 * r, h, color);
     // draw four corners
     glcd_plotcirclehalffill(x + w - r - 1, y + r, r, 1, h - 2 * r - 1, color);
@@ -1549,6 +1568,105 @@ void glcd_plotline(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, glcd_colo
 			err += dx;
 		}
 	}
+}
+
+/* Function glcd_plotregularpolygon
+ * Plots a regular polygon on the GLCD, with evenly spaced sides
+ * @public
+ * @in: xc  -- the center x coordinate
+ * @in: yc  -- the center y coordinate
+ * @in: r   -- the redius
+ * @in: sides -- number of sides
+ * @in: displ -- displacement in degreees
+ * @in: color -- the RGB color specification
+ * @out: void
+ */
+void glcd_plotregularpolygon(uint16_t xc, uint16_t yc, uint16_t r, uint16_t sides, float displ, glcd_color_t color) {
+
+	uint16_t xp, yp, xlast, ylast, xs, ys;
+
+	const float twopidiv = 6.283185307179586476925286766559f/(float)sides;
+	const float angle = displ / 57.295779513082320876798f;
+
+	if (sides == 0) {
+		// Yeah right!
+		return;
+	}
+
+	xs = xlast = xc + r*cosf(angle);
+	ys = ylast = yc + r*sinf(angle);
+
+	/* One or two sides, just plot a pixel or a line */
+	if (sides == 1) {
+		// What?
+		glcd_plotpixel(xs, ys, color);
+		return;
+	} else 	if (sides == 2) {
+		xp = xc + r*cosf(twopidiv+angle);
+		yp = yc + r*sinf(twopidiv+angle);
+		glcd_plotline(xp, yp, xs, ys, color);
+		return;
+	}
+
+	for (int i=1; i<sides; i++) {
+		xp = xc + r*cosf(twopidiv*i+angle);
+		yp = yc + r*sinf(twopidiv*i+angle);
+		glcd_plotline(xlast, ylast, xp, yp, color);
+		xlast = xp;
+		ylast = yp;
+	}
+	glcd_plotline(xlast, ylast, xs, ys, color);
+
+}
+
+/* Function glcd_plotregularpolygonfill
+ * Plots a filled regular polygon on the GLCD, with evenly spaced sides
+ * @public
+ * @in: xc  -- the center x coordinate
+ * @in: yc  -- the center y coordinate
+ * @in: r   -- the redius
+ * @in: sides -- number of sides
+ * @in: displ -- displacement in degreees
+ * @in: color -- the RGB color specification
+ * @out: void
+ */
+void glcd_plotregularpolygonfill(uint16_t xc, uint16_t yc, uint16_t r, uint16_t sides, float displ, glcd_color_t color) {
+
+	uint16_t xp, yp, xlast, ylast, xs, ys;
+
+	const float twopidiv = 6.283185307179586476925286766559f/(float)sides;
+	const float angle = displ / 57.295779513082320876798f;
+
+	if (sides == 0) {
+		// Yeah right!
+		return;
+	}
+
+	xs = xlast = xc + r*cosf(angle);
+	ys = ylast = yc + r*sinf(angle);
+
+	/* One or two sides, just plot a pixel or a line */
+	if (sides == 1) {
+		// What?
+		glcd_plotpixel(xs, ys, color);
+		return;
+	} else 	if (sides == 2) {
+		xp = xc + r*cosf(twopidiv+angle);
+		yp = yc + r*sinf(twopidiv+angle);
+		glcd_plotline(xp, yp, xs, ys, color);
+		return;
+	}
+
+	/* Sides > 2 so plot it. */
+	for (int i=1; i<sides; i++) {
+		xp = xc + r*cosf(twopidiv*i+angle);
+		yp = yc + r*sinf(twopidiv*i+angle);
+		glcd_plottrianglefill(xc, yc, xlast, ylast, xp, yp, color);
+		xlast = xp;
+		ylast = yp;
+	}
+	glcd_plottrianglefill(xc, yc, xlast, ylast, xs, ys, color);
+
 }
 
 /* Based on the AdaFruit library */
@@ -1848,7 +1966,7 @@ void glcd_plotarc(uint16_t xc, uint16_t yc, uint16_t r, float start, float stop,
  */
 void glcd_plottriangle(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t x3, uint16_t y3, glcd_color_t color) {
 	glcd_plotline(x1, y1, x2, y2, color);
-	glcd_plotline(y2, y2, x3, y3, color);
+	glcd_plotline(x2, y2, x3, y3, color);
 	glcd_plotline(x3, y3, x1, y1, color);
 }
 
@@ -1865,7 +1983,8 @@ void glcd_plottriangle(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint1
  * @in: y3  -- y point 3
  * @in: color -- the RGB color specification
  * @out: void
- */void glcd_plottrianglefill(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, glcd_color_t color) {
+ */
+void glcd_plottrianglefill(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, glcd_color_t color) {
 
 	int16_t a, b, y, last;
 
