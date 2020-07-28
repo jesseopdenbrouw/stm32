@@ -526,16 +526,16 @@ int32_t touchscreen_map(uint32_t value, uint32_t tlow, uint32_t thigh, uint32_t 
 	/* We use floats here because the STM32F has hardware support for floats */
 	float slope, start;
 
-	/* Make sure that thigh != low */
-	if (thigh!=tlow) {
-		slope  = ((float)shigh-(float)slow)/((float)thigh-(float)tlow);
-		start = - slope*(float)tlow;
-		return slope*value + start;
-	}
-
-//	if (thigh != tlow) {
-//		return ((float)value - (float)(tlow))*((float)shigh - (float)slow) / ((float)thigh - (float)tlow) + (float)slow + (float)0.5f;
+//	/* Make sure that thigh != low */
+//	if (thigh!=tlow) {
+//		slope  = ((float)shigh-(float)slow)/((float)thigh-(float)tlow);
+//		start = - slope*(float)tlow;
+//		return slope*value + start;
 //	}
+
+	if (thigh != tlow) {
+		return ((float)value - (float)(tlow))*((float)shigh - (float)slow) / ((float)thigh - (float)tlow) + (float)slow + (float)0.5f;
+	}
 
 	/* If thigh == tlow, we divide by 0 and that is not possible */
 	return INT_MIN;
