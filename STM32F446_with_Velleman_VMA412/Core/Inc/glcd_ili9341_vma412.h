@@ -7,8 +7,8 @@
 
 Software License Agreement (BSD License)
 
-Version: 0.1rc3
-Date: 2020/07/26
+Version: 0.1rc4
+Date: 2020/07/27
 
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
@@ -49,7 +49,7 @@ extern "C"
 #include <stdint.h>
 
 /* Driver version */
-#define GLCD_VERSION "STM32 VMA412 GLCD Driver v 0.1rc3 (Jul 26 2020)"
+#define GLCD_VERSION "STM32 VMA412 GLCD Driver v 0.1rc4 (Jul 27 2020)"
 
 
 /* Should we use flood fill? */
@@ -211,6 +211,8 @@ void glcd_plotarc(uint16_t xc, uint16_t yc, uint16_t r, float start, float stop,
 #endif
 void glcd_plottriangle(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t x3, uint16_t y3, glcd_color_t color);
 void glcd_plottrianglefill(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, glcd_color_t color);
+void glcd_plotregularpolygon(uint16_t xc, uint16_t yc, uint16_t r, uint16_t sides, float displ, glcd_color_t color);
+void glcd_plotregularpolygonfill(uint16_t xc, uint16_t yc, uint16_t r, uint16_t sides, float displ, glcd_color_t color);
 
 
 /* Plot a two-color bitmap on the display */
