@@ -148,6 +148,16 @@ int main(void) {
 
 #ifdef USEMAXMHZ
 
+	/* For the correct procedure to enable max core frequency,
+	 * see RM0390, page 97 (Entering Over-drive Mode)
+	 */
+
+	/* 5 wait states */
+ 	FLASH->ACR = (FLASH_ACR_LATENCY_5WS << FLASH_ACR_LATENCY_Pos);
+
+	/* Caches enable, prefetch enable */
+	FLASH->ACR |= (FLASH_ACR_PRFTEN | FLASH_ACR_ICEN | FLASH_ACR_DCEN);
+
 	/* Enable the power system */
 	do {
 		__IO uint32_t tmpreg = 0x00U;
@@ -157,6 +167,7 @@ int main(void) {
 		UNUSED(tmpreg);
 	} while(0U);
 
+	/* Select Scale 1 voltage regulator (max clock frequency) */
 	do {
 		__IO uint32_t tmpreg = 0x00U;
 		MODIFY_REG(PWR->CR, PWR_CR_VOS, PWR_REGULATOR_VOLTAGE_SCALE1);
@@ -164,13 +175,6 @@ int main(void) {
 		tmpreg = READ_BIT(PWR->CR, PWR_CR_VOS);
 		UNUSED(tmpreg);
 	} while(0U);
-
-
-	/* 5 wait states */
- 	FLASH->ACR = (FLASH_ACR_LATENCY_5WS << FLASH_ACR_LATENCY_Pos);
-
-	/* Caches enable, prefetch enable */
-	FLASH->ACR |= (FLASH_ACR_PRFTEN | FLASH_ACR_ICEN | FLASH_ACR_DCEN);
 
 	/* Select HSE bypass to use clock oscillator */
 	RCC->CR |= RCC_CR_HSEBYP;
@@ -191,10 +195,32 @@ int main(void) {
 	while ((RCC->CR & RCC_CR_HSERDY) == 0);
 	while ((RCC->CR & RCC_CR_PLLRDY) == 0);
 
-	/* APB2 clk div'd by 2, APB1 clk div'd by 4 */
-	//RCC->CFGR = (4<<RCC_CFGR_PPRE2_Pos) | (5<<RCC_CFGR_PPRE1_Pos);
-	/* APB2 clk div'd by 2, APB1 clk div'd by 1, USE PLL */
-	RCC->CFGR = (4<<RCC_CFGR_PPRE2_Pos) | (0<<RCC_CFGR_PPRE1_Pos) | (2<<RCC_CFGR_SW_Pos);
+#if defined(STM32F446xx)
+
+	/* Enable the Over-drive to extend the clock frequency to 180 MHz */
+	//PWR->CR |= PWR_CR_ODEN;
+	__HAL_PWR_OVERDRIVE_ENABLE();
+
+	/* Wait for Over-drive enable */
+	// while (!(PWR->CSR & (PWR_CSR_ODRDY)) == (PWR_CSR_ODRDY));
+	while(!__HAL_PWR_GET_FLAG(PWR_FLAG_ODRDY)) {}
+
+	/* Enable the Over-drive switch */
+	//(*(__IO uint32_t *) CR_ODSWEN_BB = ENABLE); // bit banding
+	//PWR->CR |= PWR_CR_ODSWEN;                   // normal way
+	__HAL_PWR_OVERDRIVESWITCHING_ENABLE();
+
+	/* Wait for Over-drive ready */
+	// while (!(PWR->CSR & (PWR_CSR_ODSWRDY)) == (PWR_CSR_ODSWRDY));
+	while(!__HAL_PWR_GET_FLAG(PWR_FLAG_ODSWRDY)) {}
+
+#endif
+
+	/* APB2 clk div'd by 2, APB1 clk div'd by 4, AHB div'd by 1, use PLL */
+	RCC->CFGR = (4<<RCC_CFGR_PPRE2_Pos) | (5<<RCC_CFGR_PPRE1_Pos) | (0<<RCC_CFGR_HPRE_Pos)| (2<<RCC_CFGR_SW_Pos);
+
+	/* Wait for PLL to lock on */
+	while ((RCC->CR & RCC_CR_PLLRDY) == 0);
 
 #endif
 
@@ -474,7 +500,7 @@ void demo_glcd(void) {
 	glcd_setcharsize(2, 2);
 	glcd_plotstring(0,68, "Big", GLCD_COLOR_YELLOW, GLCD_COLOR_YELLOW, GLCD_STRING_WIDE);
 
-	glcd_setcharsize(2, 2);
+	glcd_setcharsize(3, 3);
 	glcd_plotstring(0,98, "Bigger", GLCD_COLOR_YELLOW, GLCD_COLOR_YELLOW, GLCD_STRING_WIDE);
 
 	glcd_setcharsize(1, 1);
