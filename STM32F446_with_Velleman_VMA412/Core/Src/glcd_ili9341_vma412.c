@@ -8,7 +8,7 @@
 Software License Agreement (BSD License)
 
 Version: 0.1rc4
-Date: 2020/07/27
+Date: 2020/07/30
 
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
@@ -1212,8 +1212,6 @@ void glcd_setcharlayout(uint16_t c, uint16_t byte0, uint16_t byte1, uint16_t byt
 	pfont[c*5+4] = byte4;
 }
 
-
-
 /* Function glcd_plotstring
  * Plots a string to the display
  * @public
@@ -1570,6 +1568,8 @@ void glcd_plotline(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, glcd_colo
 	}
 }
 
+
+#ifdef GLCD_USE_REGULAR_POLYGON
 /* Function glcd_plotregularpolygon
  * Plots a regular polygon on the GLCD, with evenly spaced sides
  * @public
@@ -1593,8 +1593,8 @@ void glcd_plotregularpolygon(uint16_t xc, uint16_t yc, uint16_t r, uint16_t side
 		return;
 	}
 
-	xs = xlast = xc + r*cosf(angle);
-	ys = ylast = yc + r*sinf(angle);
+	xs = xlast = xc + r*cosf(angle) + 0.5f;
+	ys = ylast = yc + r*sinf(angle) + 0.5f;
 
 	/* One or two sides, just plot a pixel or a line */
 	if (sides == 1) {
@@ -1602,15 +1602,15 @@ void glcd_plotregularpolygon(uint16_t xc, uint16_t yc, uint16_t r, uint16_t side
 		glcd_plotpixel(xs, ys, color);
 		return;
 	} else 	if (sides == 2) {
-		xp = xc + r*cosf(twopidiv+angle);
-		yp = yc + r*sinf(twopidiv+angle);
+		xp = xc + r*cosf(twopidiv+angle) + 0.5f;
+		yp = yc + r*sinf(twopidiv+angle) + 0.5f;
 		glcd_plotline(xp, yp, xs, ys, color);
 		return;
 	}
 
 	for (int i=1; i<sides; i++) {
-		xp = xc + r*cosf(twopidiv*i+angle);
-		yp = yc + r*sinf(twopidiv*i+angle);
+		xp = xc + r*cosf(twopidiv*i+angle) + 0.5f;
+		yp = yc + r*sinf(twopidiv*i+angle) + 0.5f;
 		glcd_plotline(xlast, ylast, xp, yp, color);
 		xlast = xp;
 		ylast = yp;
@@ -1642,8 +1642,8 @@ void glcd_plotregularpolygonfill(uint16_t xc, uint16_t yc, uint16_t r, uint16_t 
 		return;
 	}
 
-	xs = xlast = xc + r*cosf(angle);
-	ys = ylast = yc + r*sinf(angle);
+	xs = xlast = xc + r*cosf(angle) + 0.5f;
+	ys = ylast = yc + r*sinf(angle) + 0.5f;
 
 	/* One or two sides, just plot a pixel or a line */
 	if (sides == 1) {
@@ -1651,16 +1651,16 @@ void glcd_plotregularpolygonfill(uint16_t xc, uint16_t yc, uint16_t r, uint16_t 
 		glcd_plotpixel(xs, ys, color);
 		return;
 	} else 	if (sides == 2) {
-		xp = xc + r*cosf(twopidiv+angle);
-		yp = yc + r*sinf(twopidiv+angle);
+		xp = xc + r*cosf(twopidiv+angle) + 0.5f;
+		yp = yc + r*sinf(twopidiv+angle) + 0.5f;
 		glcd_plotline(xp, yp, xs, ys, color);
 		return;
 	}
 
 	/* Sides > 2 so plot it. */
 	for (int i=1; i<sides; i++) {
-		xp = xc + r*cosf(twopidiv*i+angle);
-		yp = yc + r*sinf(twopidiv*i+angle);
+		xp = xc + r*cosf(twopidiv*i+angle) + 0.5f;
+		yp = yc + r*sinf(twopidiv*i+angle) + 0.5f;
 		glcd_plottrianglefill(xc, yc, xlast, ylast, xp, yp, color);
 		xlast = xp;
 		ylast = yp;
@@ -1668,6 +1668,7 @@ void glcd_plotregularpolygonfill(uint16_t xc, uint16_t yc, uint16_t r, uint16_t 
 	glcd_plottrianglefill(xc, yc, xlast, ylast, xs, ys, color);
 
 }
+#endif
 
 /* Based on the AdaFruit library */
 /* Function glcd_plotbitmap
@@ -1945,8 +1946,8 @@ void glcd_plotarc(uint16_t xc, uint16_t yc, uint16_t r, float start, float stop,
 
 	for (f = start; f <= stop; f = f + inc_angle) {
 		/* We use sinf and cosf because of the hardware FPU */
-		x = xc + r*cosf(f);
-		y = yc + r*sinf(f);
+		x = xc + r*cosf(f) + 0.5f;
+		y = yc + r*sinf(f) + 0.5f;
 		glcd_plotpixel(x, y, color);
 	}
 }
