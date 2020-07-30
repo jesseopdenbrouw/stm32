@@ -7,8 +7,8 @@
 
 Software License Agreement (BSD License)
 
-Version: 0.1rc3
-Date: 2020/07/26
+Version: 0.1rc4
+Date: 2020/07/30
 
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
@@ -524,7 +524,7 @@ uint32_t touchscreen_pressure(void) {
 int32_t touchscreen_map(uint32_t value, uint32_t tlow, uint32_t thigh, uint32_t slow, uint32_t shigh) {
 
 	/* We use floats here because the STM32F has hardware support for floats */
-	float slope, start;
+//	float slope, start;
 
 //	/* Make sure that thigh != low */
 //	if (thigh!=tlow) {
