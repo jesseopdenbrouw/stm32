@@ -761,6 +761,8 @@ void test(void) {
 		color += 0x100000;
 	}
 
+//	glcd_plotregularpolygon(160, 120, 100, 5, -90.0, GLCD_COLOR_YELLOW);
+
 	while (1) {
 //
 //		p = touchscreen_pressure();
