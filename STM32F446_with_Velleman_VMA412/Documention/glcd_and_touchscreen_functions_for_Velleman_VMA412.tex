@@ -51,7 +51,7 @@
 }
 
 
-\author{Version 0.1rc3\\[2ex]Jesse op den Brouw\thanks{Please mail me at: \href{mailto:J.E.J.opdenBrouw@hhs.nl}{J.E.J.opdenBrouw@hhs.nl}}\\The Hague University of Applied Sciences\\(THUAS)}
+\author{Version 0.1rc4\\[2ex]Jesse op den Brouw\thanks{Please mail me at: \href{mailto:J.E.J.opdenBrouw@hhs.nl}{J.E.J.opdenBrouw@hhs.nl}}\\The Hague University of Applied Sciences\\(THUAS)}
 \title{Graphic LCD and Touchscreen Functions for Velleman VMA412 with ILI9341 Controller used with a STM32F446 Nucleo Board}
 \date{\today}
 
@@ -673,7 +673,8 @@ void glcd_plotarc(uint16_t xc,                // center x coordinate
 \end{lstlisting}
 
 Note: this function is only available if \lstinline|GLCD_USE_ARC| is defined.\\
-Note: this function uses \lstinline|sinf| and \lstinline|cosf| math functions, using the onboard FPU.
+Note: this function uses \lstinline|sinf| and \lstinline|cosf| math functions, using the onboard FPU.\\
+Note: start and stop angles are counted from the positive x axis downwards.
 
 \subsubsection{Plot a 2-color bitmap}
 \ifunc{glcd\_plotbitmap}
@@ -846,6 +847,7 @@ There are a number of \lstinline|#define|'s that can be manipulated to taylor th
 #define GLCD_USE_FLOOD_FILL
 #define GLCD_STACK_SIZE (2000)
 #define GLCD_USE_FLOOD_FILL_PRINT_IF_STACK_OVERFLOW
+#define GLCD_USE_REGULAR_POLYGON
 #define GLCD_USE_ARC
 #define GLCD_CHARCTERS_IN_RAM
 #define GLCD_HAVE_THUAS_BITMAPS
@@ -854,7 +856,7 @@ There are a number of \lstinline|#define|'s that can be manipulated to taylor th
 #define GLCD_HEIGHT (240)
 \end{lstlisting}
 
-Define \lstinline|GLCD_USE_FLOOD_FILL| if you need to (flood) fill objects, undefine to save ROM  and RAM resources. If you use flood fill, set the stack size \lstinline|GLCD_STACK_SIZE| to an appropriate size. While testing or debugging, define \lstinline|GLCD_USE_FLOOD_FILL_PRINT_IF_STACK_OVERFLOW|. This will print warning messages if there is a stack overflow when filling objects. Undefine if you are sure there will be no stack overflow. Define \lstinline|GLCD_USE_ARC| if you need to plot arcs, undefine to save ROM resources. Plotting arcs use the onboard FPU for sine and cosine calculations. Define \lstinline|GLCD_CHARACTERS_IN_RAM| to place the character table in RAM. This way you can change the view of a character by changing the bit patterns (but of course is uses extra RAM). Define \lstinline|GLCD_HAVE_THUAS_BITMAPS| if you need the buildin THUAS logos (you probably won't need them).
+Define \lstinline|GLCD_USE_FLOOD_FILL| if you need to (flood) fill objects, undefine to save ROM  and RAM resources. If you use flood fill, set the stack size \lstinline|GLCD_STACK_SIZE| to an appropriate size. While testing or debugging, define \lstinline|GLCD_USE_FLOOD_FILL_PRINT_IF_STACK_OVERFLOW|. This will print warning messages if there is a stack overflow when filling objects. Undefine if you are sure there will be no stack overflow. Define \lstinline|GLCD_USE_ARC| if you need to plot arcs, undefine to save ROM resources. Plotting arcs use the onboard FPU for sine and cosine calculations. Define \lstinline|GLCD_USE_REGULAR_POLYGON| if you need to plot regular polygons, undefine to save ROM resources. Plotting regular polygons use the onboard FPU for sine and cosine calculations. Define \lstinline|GLCD_CHARACTERS_IN_RAM| to place the character table in RAM. This way you can change the view of a character by changing the bit patterns (but of course is uses extra RAM). Define \lstinline|GLCD_HAVE_THUAS_BITMAPS| if you need the buildin THUAS logos (you probably won't need them).
 
 Leave \lstinline|GLCD_WIDTH| and \lstinline|GLCD_HEIGHT| to their respective values.
 
