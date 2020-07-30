@@ -1,7 +1,7 @@
 
 %%% glcd_and_touchscreen_functions_for_velleman_VMA412.tex
 %%%
-%%%   Documentation for version 0.1rc3
+%%%   Documentation for version 0.1rc4
 %%%
 %%%
 %%% Copyright 2020 J.E.J. op den BRouw
@@ -75,6 +75,8 @@ The library is tested using a STM32F446 Nucleo board and STMCubeIDE version 1.3.
 
 The VMA412 has an SD-card socket. This library has \textbf{no} support for accessing SD-cards.
 
+This library was tested on a STM32F446RE and STM32F411RE (Nucleo boards).
+
 }
 \vfill
 
@@ -138,6 +140,9 @@ This work has the LPPL maintenance status `maintained'.
 The Current Maintainer of this work is J.E.J. op den Brouw.
 \end{lstlisting}
 
+\section{Thanks to}
+Many functions in the library are based on, or reused from the AdaFruit GFX library (\url{https://github.com/adafruit/Adafruit-GFX-Library}). Many thanks from the author for providing these functions.
+
 
 \section{Mouting the VMA412}
 The Velleman VM412 is an Arduino Uno/Mega compatible 2.8" color Touchscreen Graphic LCD with 320x240 pixels controlled by an ILI9431 graphic controller.
@@ -162,7 +167,7 @@ glcd_ili9341_vma412.c   -- place in Core/Src, functions to call
 touchscreen_vma412.h    -- place in Core/Inc, definitions, typedefs etc
 touchscreen_vma412.c    -- place in Core/Src, functions to call
 main.c                  -- place in Core/Src, demo using functions
-woof_map.c              -- place in Core/Src, used in the demo
+dog_map.c               -- place in Core/Src, used in the demo
 \end{lstlisting}
 
 
@@ -1285,6 +1290,8 @@ Some todo's left:
 %\item Calculation of raw touchscreen X and pressure with \lstinline|rx_plate| set to non-standard value.
 %\item More gory details on reading the touchscreen;
 \end{itemize}
+
+This list will grow over time, and items implemented will be removed.
 
 %% Add index to toc with clickable reference
 \cleardoublepage
