@@ -38,7 +38,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
  */
 
-#if !defined(STM32F446xx) && !defined(STM32F411xx)
+#if !defined(STM32F446xx) && !defined(STM32F411xE)
 #warning !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #warning ! Only tested with STM32F446 Nucleo Board !
 #warning ! Only tested with STM32F411 Nucleo Board !
@@ -57,8 +57,8 @@ POSSIBILITY OF SUCH DAMAGE.
 
 /* Test for boards */
 #if defined(STM32F446xx)
-#define GLCD_RCC_M (336)
-#elif defined(STM32F411xx)
+#define GLCD_RCC_M (360)
+#elif defined(STM32F411xE)
 #define GLCD_RCC_M (250)
 #else
 #undef USEMAXMHZ
@@ -72,7 +72,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #define MEASUREMENT
 
 /* Let's see if we can plot an 256-color indexed picture */
-#define HAVE_WOOF
+#define HAVE_DOG
 
 /* For testing purposes, if you know what your're doing */
 //#define USE_TEST
@@ -138,8 +138,8 @@ void demo_characterset(void);
 void test(void);
 #endif
 
-#ifdef HAVE_WOOF
-extern const uint8_t woof_map[];
+#ifdef HAVE_DOG
+extern const uint8_t dog_map[];
 #endif
 
 int main(void) {
@@ -545,10 +545,10 @@ void demo_glcd(void) {
 
 	glcd_delay_ms(2000);
 
-#ifdef HAVE_WOOF
+#ifdef HAVE_DOG
 	/* Plot the image */
 	START_CLOCK();
-	glcd_plotbitmap8bpp(0, 0, 320, 240, woof_map, NULL);
+	glcd_plotbitmap8bpp(0, 0, 320, 240, dog_map, NULL);
     GET_CLOCK(14);
 #endif
 
