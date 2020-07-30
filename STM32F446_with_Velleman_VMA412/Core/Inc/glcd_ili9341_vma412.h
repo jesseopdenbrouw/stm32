@@ -8,7 +8,7 @@
 Software License Agreement (BSD License)
 
 Version: 0.1rc4
-Date: 2020/07/27
+Date: 2020/07/30
 
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
@@ -49,7 +49,7 @@ extern "C"
 #include <stdint.h>
 
 /* Driver version */
-#define GLCD_VERSION "STM32 VMA412 GLCD Driver v 0.1rc4 (Jul 27 2020)"
+#define GLCD_VERSION "STM32 VMA412 GLCD Driver v 0.1rc4 (Jul 30 2020)"
 
 
 /* Should we use flood fill? */
@@ -60,6 +60,8 @@ extern "C"
 #define GLCD_USE_FLOOD_FILL_PRINT_IF_STACK_OVERFLOW
 /* Do we include the arc function, needs sinf and cosf functions */
 #define GLCD_USE_ARC
+/* Do we include the regular polygon functions */
+#define GLCD_USE_REGULAR_POLYGON
 /* Character table in ROM or RAM */
 /* Note: although you can set the character table to RAM, it
  * still occupies ROM. The character table is then copied
@@ -211,9 +213,10 @@ void glcd_plotarc(uint16_t xc, uint16_t yc, uint16_t r, float start, float stop,
 #endif
 void glcd_plottriangle(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t x3, uint16_t y3, glcd_color_t color);
 void glcd_plottrianglefill(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, glcd_color_t color);
+#ifdef GLCD_USE_REGULAR_POLYGON
 void glcd_plotregularpolygon(uint16_t xc, uint16_t yc, uint16_t r, uint16_t sides, float displ, glcd_color_t color);
 void glcd_plotregularpolygonfill(uint16_t xc, uint16_t yc, uint16_t r, uint16_t sides, float displ, glcd_color_t color);
-
+#endif
 
 /* Plot a two-color bitmap on the display */
 void glcd_plotbitmap(uint16_t x, uint16_t y, const uint8_t bitmap[], uint16_t w, uint16_t h, glcd_color_t color, glcd_color_t bg);
