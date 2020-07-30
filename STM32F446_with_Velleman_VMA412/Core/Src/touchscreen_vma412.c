@@ -196,25 +196,30 @@ uint32_t touchscreen_init(ADC_TypeDef *used_ADC) {
 	RCC->AHB1ENR |= TOUCH_GPIO_USED;
 
 	/* Enable ADCx clock */
+#ifdef ADC
 #ifdef ADC1
 	if (pADC == ADC1) {
 		RCC->APB2ENR |= (1<<RCC_APB2ENR_ADC1EN_Pos);
+	}
 #endif
 #ifdef ADC2
-	} else if (pADC == ADC2) {
+	else if (pADC == ADC2) {
 		RCC->APB2ENR |= (1<<RCC_APB2ENR_ADC2EN_Pos);
+	}
 #endif
-/* ADC can't be used because two of the pins are not available on ADC3 */
+/* ADC3 can't be used because two of the pins are not available on ADC3 */
 //#ifdef ADC3
-//	} else if (pADC == ADC3) {
+//	else if (pADC == ADC3) {
 //		RCC->APB2ENR |= (1<<RCC_APB2ENR_ADC3EN_Pos);
-//	} else {
+//	}
 //#endif
+	else {
 		/* Unknown ADC */
 		pADC = NULL;
 		return 0;
-#ifdef ADC
 	}
+#else
+	return 0;
 #endif
 
 	/* ADC Clock, prescaler = 8 (slowest speed), for all ADCs */
