@@ -75,7 +75,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #define HAVE_DOG
 
 /* For testing purposes, if you know what your're doing */
-//#define USE_TEST
+#define USE_TEST
 
 
 #ifdef MEASUREMENT
@@ -97,7 +97,7 @@ POSSIBILITY OF SUCH DAMAGE.
 								  "Plot pixel (100000x):   ", /*  2 */ \
 								  "Plot circle (100x):     ", /*  3 */ \
 								  "Plot rectangle (1000x): ", /*  4 */ \
-								  "Plot filled rect (100x):", /*  5 */ \
+								  "Plot filled rect (50x): ", /*  5 */ \
 								  "Plot filled circ (100x):", /*  6 */ \
 								  "Plot filled tria (100x):", /*  7 */ \
 								  "Flood fill circle:      ", /*  8 */ \
@@ -425,10 +425,10 @@ void demo_glcd(void) {
 	}
 	GET_CLOCK(4);
 
-	glcd_puts("Plotting 100 filled rectangles...\n");
+	glcd_puts("Plotting 50 filled rectangles...\n");
 
 	START_CLOCK();
-	for (i = 0; i < 100; i++) {
+	for (i = 0; i < 50; i++) {
 		glcd_plotrectfill(20,100, 200, 100, color);
 		color += 0x030104;
 	}
@@ -525,7 +525,7 @@ void demo_glcd(void) {
 	/* Now for some alternative fonts */
 	glcd_cls(GLCD_COLOR_MAROON);
 
-	glcd_plotstring(0, 0, "Now some alternative fonts...", GLCD_COLOR_PINK, GLCD_COLOR_PINK, GLCD_STRING_CONDENSED);
+	glcd_plotstring(0, 0, "Now for some alternative fonts...", GLCD_COLOR_PINK, GLCD_COLOR_PINK, GLCD_STRING_NORMAL);
 
 	/* Use address of font handle */
 	glcd_setfont(&FreeMono12pt7b);
@@ -535,7 +535,14 @@ void demo_glcd(void) {
 	/* Use address of font handle */
 	glcd_setfont(&FreeSerif12pt7b);
 
+
+	int16_t xleft, yupper, w, h;
+
 	glcd_plotstringwithfont(0, 150, "This is a serif font", GLCD_COLOR_PINK, GLCD_STRING_NORMAL);
+	glcd_delay_ms(2000);
+	glcd_plotstring(0, 10, "Find bounding box for string...", GLCD_COLOR_PINK, GLCD_COLOR_PINK, GLCD_STRING_NORMAL);
+	glcd_getstringsizewithfont(0, 150, "This is a serif font", &xleft, &yupper, &w, &h, GLCD_STRING_NORMAL);
+	glcd_plotrect(xleft, yupper, w, h, GLCD_COLOR_ORANGE);
 
 	glcd_setfont(NULL);
 
@@ -817,7 +824,7 @@ void test(void) {
 //
 //	glcd_plotrect(0, 150-h, w, h, GLCD_COLOR_YELLOW);
 
-	glcd_setfont(&FreeSerif12pt7b);
+//	glcd_setfont(&FreeSerif12pt7b);
 
 	//	int16_t x=0,y=100,minx=glcd_getwidth(),miny=glcd_getheight(),maxx=0,maxy=0;
 //	glcd_plotstringwithfont(0, 100, "q", GLCD_COLOR_PINK, GLCD_STRING_NORMAL);
@@ -825,22 +832,22 @@ void test(void) {
 //	                              &minx, &miny, &maxx,
 //	                              &maxy);
 	//glcd_plotrect(minx, miny, maxx-minx, maxy-miny, GLCD_COLOR_YELLOW);
-
-	glcd_plotstring(10, 10, "Now some alternative fonts...", GLCD_COLOR_PINK, GLCD_COLOR_PINK, GLCD_STRING_NORMAL);
-	glcd_plotcircle(10, 10, 5, GLCD_COLOR_BLUE);
-
-	int16_t x=30, y=100, xleft, yupper;
-	int16_t w, h;
-
-	glcd_getstringsizewithfont(x, y, "HalloeQxqpjKklmnoy", &xleft, &yupper, &w, &h, GLCD_STRING_NORMAL);
-//	glcd_plotrect(xleft, yupper, w, h, GLCD_COLOR_YELLOW);
-	glcd_plotrect(xleft-1, yupper-1, w+2, h+2, GLCD_COLOR_YELLOW);
-	glcd_plotstringwithfont(x, y, "HalloeQxqpjKklmnoy", GLCD_COLOR_PINK, GLCD_STRING_NORMAL);
-
-
-
-	glcd_plotcircle(xleft, yupper, 5, GLCD_COLOR_ORANGE);
-	glcd_plotcircle(x, y, 5, GLCD_COLOR_BLUE);
+//
+//	glcd_plotstring(10, 10, "Now some alternative fonts...", GLCD_COLOR_PINK, GLCD_COLOR_PINK, GLCD_STRING_NORMAL);
+//	glcd_plotcircle(10, 10, 5, GLCD_COLOR_BLUE);
+//
+//	int16_t x=30, y=100, xleft, yupper;
+//	int16_t w, h;
+//
+//	glcd_getstringsizewithfont(x, y, "HalloeQxqpjKklmnoy", &xleft, &yupper, &w, &h, GLCD_STRING_NORMAL);
+////	glcd_plotrect(xleft, yupper, w, h, GLCD_COLOR_YELLOW);
+//	glcd_plotrect(xleft-1, yupper-1, w+2, h+2, GLCD_COLOR_YELLOW);
+//	glcd_plotstringwithfont(x, y, "HalloeQxqpjKklmnoy", GLCD_COLOR_PINK, GLCD_STRING_NORMAL);
+//
+//
+//
+//	glcd_plotcircle(xleft, yupper, 5, GLCD_COLOR_ORANGE);
+//	glcd_plotcircle(x, y, 5, GLCD_COLOR_BLUE);
 
 //	x = 100; y = 150;
 //
@@ -848,7 +855,22 @@ void test(void) {
 //	glcd_getcharsizewithfont(x, y, 'M', &xleft, &yupper, &w, &h);
 //	glcd_plotrect(xleft, yupper, w, h, GLCD_COLOR_YELLOW);
 
-	glcd_setfont(NULL);
+//	glcd_setfont(NULL);
+
+	//glcd_plotcirclefill(20, 100, 30, GLCD_COLOR_PINK);
+	//glcd_plotregularpolygonfill(100, 100, 130, 6, 0, GLCD_COLOR_PINK);
+	//glcd_plotarc(50, 100, 80, -90.0, 90.0, GLCD_COLOR_PINK);
+
+	//glcd_plotrect(120, 80, 300, 70, GLCD_COLOR_PINK);
+
+//	glcd_plothorizontalline(360, 10, -100, GLCD_COLOR_PINK);
+//	glcd_plotcircle(360-100, 10, 5, GLCD_COLOR_ORANGE);
+
+	//glcd_plotverticalline(20, 20, 400, GLCD_COLOR_PINK);
+
+	glcd_plotrectfill(100, 100, 300, 100, GLCD_COLOR_PINK);
+	glcd_plotrectroundedfill(100, 100, 300, 100, 15, GLCD_COLOR_BLACK);
+	glcd_plotrectrounded(100, 100, 300, 100, 15, GLCD_COLOR_ORANGE);
 
 	glcd_delay_ms(100);
 
