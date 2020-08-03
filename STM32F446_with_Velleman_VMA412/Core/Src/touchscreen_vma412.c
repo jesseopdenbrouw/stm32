@@ -7,8 +7,8 @@
 
 Software License Agreement (BSD License)
 
-Version: 0.1rc4
-Date: 2020/07/30
+Version: 0.1rc5
+Date: 2020/08/03
 
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
@@ -280,7 +280,7 @@ void touchscreen_setadcspeed(uint32_t speed) {
  * @in: void
  * @out: raw X-value
  */
-uint32_t touchscreen_readrawx(void) {
+int32_t touchscreen_readrawx(void) {
 
 	uint32_t MODERA, MODERB, MODERC;
 
@@ -350,7 +350,7 @@ uint32_t touchscreen_readrawx(void) {
  * @in: void
  * @out: raw Y-value
  */
-uint32_t touchscreen_readrawy(void) {
+int32_t touchscreen_readrawy(void) {
 
 	uint32_t MODERA, MODERB, MODERC;
 
@@ -423,7 +423,7 @@ uint32_t touchscreen_readrawy(void) {
  * @in: void
  * @out: raw pressure value
  */
-uint32_t touchscreen_pressure(void) {
+int32_t touchscreen_pressure(void) {
 
 	uint32_t p1, p2;
 	uint32_t MODERA, MODERB, MODERC;
@@ -526,7 +526,7 @@ uint32_t touchscreen_pressure(void) {
  * @in: shigh --> screen raw higest value
  * @out: remapped value (note: signed integer, so may be negative)
  */
-int32_t touchscreen_map(uint32_t value, uint32_t tlow, uint32_t thigh, uint32_t slow, uint32_t shigh) {
+int32_t touchscreen_map(int32_t value, int32_t tlow, int32_t thigh, int32_t slow, int32_t shigh) {
 
 	/* We use floats here because the STM32F has hardware support for floats */
 //	float slope, start;
@@ -539,7 +539,7 @@ int32_t touchscreen_map(uint32_t value, uint32_t tlow, uint32_t thigh, uint32_t 
 //	}
 
 	if (thigh != tlow) {
-		return ((float)value - (float)(tlow))*((float)shigh - (float)slow) / ((float)thigh - (float)tlow) + (float)slow + (float)0.5f;
+		return ((float)value - (float)(tlow))*((float)shigh - (float)slow) / ((float)thigh - (float)tlow) + (float)slow + 0.5f;
 	}
 
 	/* If thigh == tlow, we divide by 0 and that is not possible */
@@ -550,7 +550,7 @@ int32_t touchscreen_map(uint32_t value, uint32_t tlow, uint32_t thigh, uint32_t 
  * Is touchscreen pressed or not?
  * @public
  * @in: p --> the raw pressure value
- * @out: 0 is not pressed, !0 if pressed
+ * @out: 0 if not pressed, !0 if pressed
  */
 uint32_t touchscreen_ispressed(uint32_t p) {
 	return (p>=TOUCH_PRESSURE_LOW && p<=TOUCH_PRESSURE_HIGH);
