@@ -7,8 +7,8 @@
 
 Software License Agreement (BSD License)
 
-Version: 0.1rc4
-Date: 2020/07/30
+Version: 0.1rc5
+Date: 2020/08/03
 
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
@@ -51,14 +51,14 @@ extern "C"
 #include "main.h"
 
 /* Driver version */
-#define TOUCH_VERSION "STM32 VMA412 TS Driver v 0.1rc4 (Jul 30 2020)"
+#define TOUCH_VERSION "STM32 VMA412 TS Driver v 0.1rc5 (Aug 3 2020)"
 
-/* Calibrate the touchscreen */
+/* Calibrate the touchscreen, values but be 0 - 1023 */
 #define TOUCH_LEFT 120
 #define TOUCH_RIGHT 940
 #define TOUCH_TOP 900
 #define TOUCH_BOTTOM 120
-#define TOUCH_PRESSURE_LOW 150
+#define TOUCH_PRESSURE_LOW 100
 #define TOUCH_PRESSURE_HIGH 1000
 
 /* Number of samples to take for x, y and pressure */
@@ -73,13 +73,13 @@ uint32_t touchscreen_init(ADC_TypeDef *used_ADC);
 void touchscreen_setadcspeed(uint32_t speed);
 
 /* Read raw X position */
-uint32_t touchscreen_readrawx(void);
+int32_t touchscreen_readrawx(void);
 
 /* Read raw Y position */
-uint32_t touchscreen_readrawy(void);
+int32_t touchscreen_readrawy(void);
 
 /* Read raw pressure */
-uint32_t touchscreen_pressure(void);
+int32_t touchscreen_pressure(void);
 
 /* Map the x or y value to screen coordinates (for example) */
 /* tlow = touch lowest
@@ -87,7 +87,7 @@ uint32_t touchscreen_pressure(void);
  * slow = screen lowest
  * shigh = screen highest
  */
-int32_t touchscreen_map(uint32_t value, uint32_t tlow, uint32_t thigh, uint32_t slow, uint32_t shigh);
+int32_t touchscreen_map(int32_t value, int32_t tlow, int32_t thigh, int32_t slow, int32_t shigh);
 
 /* 1 if pressed, 0 if not pressed */
 uint32_t touchscreen_ispressed(uint32_t p);
