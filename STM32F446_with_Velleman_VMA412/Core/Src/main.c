@@ -7,8 +7,8 @@
 
 Software License Agreement (BSD License)
 
-Version: 0.1rc4
-Date: 2020/07/27
+Version: 0.1rc5
+Date: 2020/08/02
 
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
@@ -49,7 +49,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <math.h>
 #include <stdint.h>
 
-#include "glcd_ili9341_vma412.h"
+#include "glcd_vma412.h"
 #include "touchscreen_vma412.h"
 
 #include "main.h"
@@ -75,7 +75,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #define HAVE_DOG
 
 /* For testing purposes, if you know what your're doing */
-//#define USE_TEST
+#define USE_TEST
 
 
 #ifdef MEASUREMENT
@@ -92,7 +92,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #define SETUP_CLOCK() \
 	volatile uint32_t clockval[20] = {0}; \
 	volatile uint32_t prescaler = SystemCoreClock/1000000UL/8UL; \
-	const char *clocknames[20] ={ "GLCD initialize:        ", /*  0 */ \
+	char *clocknames[20] ={ "GLCD initialize:        ", /*  0 */ \
 			                      "Clear screen (8x):      ", /*  1 */ \
 								  "Plot pixel (100000x):   ", /*  2 */ \
 								  "Plot circle (100x):     ", /*  3 */ \
@@ -141,6 +141,14 @@ void test(void);
 #ifdef HAVE_DOG
 extern const uint8_t dog_map[];
 #endif
+
+/* Use the THUAS bitmaps */
+extern const uint8_t glcd_thuas_map[];
+extern const uint8_t glcd_thuas_small_map[];
+
+/* Use alternate fonts */
+extern const GFXfont FreeSerif12pt7b;
+extern const GFXfont FreeMono12pt7b;
 
 int main(void) {
 
@@ -352,7 +360,7 @@ void demo_touchscreen(void) {
 		/* Read raw pressure */
 		p = touchscreen_pressure();
 
-		color++;
+		color += 0x010104;
 
 		if (touchscreen_ispressed(p)) {
 			/* Touched in the upper right corner? Then clear screen */
@@ -479,7 +487,7 @@ void demo_glcd(void) {
 		GET_CLOCK(11);
 	}
 
-	glcd_puts("\fMiscellaneous");
+	glcd_puts("\fMiscellaneous printing and plotting");
 
 	/* Plot the sine and cosine */
 	const float angle = 2*M_PI/320.0f;
@@ -511,6 +519,25 @@ void demo_glcd(void) {
 			glcd_plotchar( 10+j*6, 150+i*9, i*32+j, GLCD_COLOR_YELLOW, GLCD_COLOR_YELLOW);
 		}
 	}
+
+	glcd_delay_ms(5000);
+
+	/* Now for some alternative fonts */
+	glcd_cls(GLCD_COLOR_MAROON);
+
+	glcd_plotstring(0, 0, "Now some alternative fonts...", GLCD_COLOR_PINK, GLCD_COLOR_PINK, GLCD_STRING_CONDENSED);
+
+	/* Use address of font handle */
+	glcd_setfont(&FreeMono12pt7b);
+
+	glcd_plotstringwithfont(0, 100, "This is a monotype font", GLCD_COLOR_PINK, GLCD_STRING_CONDENSED);
+
+	/* Use address of font handle */
+	glcd_setfont(&FreeSerif12pt7b);
+
+	glcd_plotstringwithfont(0, 150, "This is a serif font", GLCD_COLOR_PINK, GLCD_STRING_NORMAL);
+
+	glcd_setfont(NULL);
 
 	glcd_delay_ms(5000);
 
@@ -557,7 +584,7 @@ void demo_glcd(void) {
 	/* Plot the THUAS bitmap */
 	glcd_cls(GLCD_COLOR_WHITE);
 	START_CLOCK();
-	glcd_plotbitmap(0, 72, GLCD_THUAS_DEFAULT_BITMAP, 320, 96, GLCD_COLOR_THUASGREEN, GLCD_COLOR_WHITE);
+	glcd_plotbitmap(0, 72, glcd_thuas_map, 320, 96, GLCD_COLOR_THUASGREEN, GLCD_COLOR_WHITE);
 	GET_CLOCK(15);
 	//glcd_plotbitmap(0, 0, GLCD_THUAS_DEFAULT_BITMAP_SMALL, 160, 48, GLCD_COLOR_THUASGREEN, GLCD_COLOR_WHITE);
 	glcd_plotstring(100, 200, "Department of Electrical Engineering", GLCD_COLOR_THUASGREEN, GLCD_COLOR_WHITE, GLCD_STRING_NORMAL);
@@ -612,7 +639,7 @@ void demo_rotation(void) {
 	/* Rotation 90 degrees */
 	glcd_cls(GLCD_COLOR_BLACK);
 
-	glcd_setrotation(GLCD_SCREEN_ROT90);
+	glcd_setrotation(GLCD_DISPLAY_ROT90);
 
 	glcd_plotrectfill(20, 120, 20, 20, GLCD_COLOR_YELLOW);
 	glcd_plotstring(50, 126, "Touch rectangle", GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
@@ -642,7 +669,7 @@ void demo_rotation(void) {
 				glcd_plotstring(20, 20, "Touched!", GLCD_COLOR_BLUE, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
 			}
 			if (x>=20 && x<=20+20 && y>=180 && y<=180+20) {
-				glcd_setrotation(GLCD_SCREEN_ROT0);
+				glcd_setrotation(GLCD_DISPLAY_ROT0);
 				break;
 			}
 		} else {
@@ -653,7 +680,7 @@ void demo_rotation(void) {
 	/* Rotation 180 degrees */
 	glcd_cls(GLCD_COLOR_BLACK);
 
-	glcd_setrotation(GLCD_SCREEN_ROT180);
+	glcd_setrotation(GLCD_DISPLAY_ROT180);
 
 	glcd_plotrectfill(20, 120, 20, 20, GLCD_COLOR_YELLOW);
 	glcd_plotstring(50, 126, "Touch rectangle", GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
@@ -683,7 +710,7 @@ void demo_rotation(void) {
 				glcd_plotstring(20, 20, "Touched!", GLCD_COLOR_BLUE, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
 			}
 			if (x>=20 && x<=20+20 && y>=180 && y<=180+20) {
-				glcd_setrotation(GLCD_SCREEN_ROT0);
+				glcd_setrotation(GLCD_DISPLAY_ROT0);
 				break;
 			}
 		} else {
@@ -694,7 +721,7 @@ void demo_rotation(void) {
 	/* Rotation 270 degrees */
 	glcd_cls(GLCD_COLOR_BLACK);
 
-	glcd_setrotation(GLCD_SCREEN_ROT270);
+	glcd_setrotation(GLCD_DISPLAY_ROT270);
 
 	glcd_plotrectfill(20, 120, 20, 20, GLCD_COLOR_YELLOW);
 	glcd_plotstring(50, 126, "Touch rectangle", GLCD_COLOR_YELLOW, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
@@ -724,7 +751,7 @@ void demo_rotation(void) {
 				glcd_plotstring(20, 20, "Touched!", GLCD_COLOR_BLUE, GLCD_COLOR_BLACK, GLCD_STRING_NORMAL);
 			}
 			if (x>=20 && x<=20+20 && y>=180 && y<=180+20) {
-				glcd_setrotation(GLCD_SCREEN_ROT0);
+				glcd_setrotation(GLCD_DISPLAY_ROT0);
 				break;
 			}
 		} else {
@@ -764,54 +791,74 @@ void demo_characterset(void) {
 	while (!touchscreen_ispressed(touchscreen_pressure())) {}
 }
 
-#ifdef USE_TEST
+
 void test(void) {
 
-//	char buffer[40];
-//	volatile uint32_t x, y, p=0;
-//	volatile int32_t xc, yc;
-	glcd_color_t color = GLCD_COLOR_YELLOW;
+	uint32_t p;
 
-	//glcd_setrotation(GLCD_SCREEN_ROT90);
+	/* Now for some alternative fonts */
+	glcd_cls(GLCD_COLOR_MAROON);
 
-//		glcd_cls(GLCD_COLOR_RED);
+//	glcd_plotstring(0, 0, "Now some alternative fonts...", GLCD_COLOR_PINK, GLCD_COLOR_PINK, GLCD_STRING_CONDENSED);
 //
-	glcd_puts("\f");
-//	glcd_puts("Halllo 123\n");
+//	/* Use address of font handle */
+//	glcd_setfont(&FreeMono12pt7b);
 //
-//	glcd_plotrect(100, 100, 150, 130, GLCD_COLOR_RED);
-//	glcd_terminate_write();
+//	glcd_plotstringwithfont(0, 100, "This is a monotype font", GLCD_COLOR_PINK, GLCD_STRING_CONDENSED);
+//
+//	/* Use address of font handle */
+//	glcd_setfont(&FreeSerif12pt7b);
+//
+//	glcd_plotstringwithfont(0, 150, "a", GLCD_COLOR_PINK, GLCD_STRING_NORMAL);
+//
+//	uint16_t w, h;
+//
+//	glcd_getstringsizewithfont("a", &w, &h, GLCD_STRING_NORMAL);
+//
+//	glcd_plotrect(0, 150-h, w, h, GLCD_COLOR_YELLOW);
 
-	for (int i = 0; i <10; i++) {
-		glcd_plotregularpolygonfill(160, 120, 100, 10, i*36, color);
-		color += 0x100000;
-	}
+	glcd_setfont(&FreeSerif12pt7b);
 
-//	glcd_plotregularpolygon(160, 120, 100, 5, -90.0, GLCD_COLOR_YELLOW);
+	//	int16_t x=0,y=100,minx=glcd_getwidth(),miny=glcd_getheight(),maxx=0,maxy=0;
+//	glcd_plotstringwithfont(0, 100, "q", GLCD_COLOR_PINK, GLCD_STRING_NORMAL);
+//	glcd_getcharboundshelper('q', &x, &y,
+//	                              &minx, &miny, &maxx,
+//	                              &maxy);
+	//glcd_plotrect(minx, miny, maxx-minx, maxy-miny, GLCD_COLOR_YELLOW);
+
+	glcd_plotstring(10, 10, "Now some alternative fonts...", GLCD_COLOR_PINK, GLCD_COLOR_PINK, GLCD_STRING_NORMAL);
+	glcd_plotcircle(10, 10, 5, GLCD_COLOR_BLUE);
+
+	int16_t x=30, y=100, xleft, yupper;
+	int16_t w, h;
+
+	glcd_getstringsizewithfont(x, y, "HalloeQxqpjKklmnoy", &xleft, &yupper, &w, &h, GLCD_STRING_NORMAL);
+//	glcd_plotrect(xleft, yupper, w, h, GLCD_COLOR_YELLOW);
+	glcd_plotrect(xleft-1, yupper-1, w+2, h+2, GLCD_COLOR_YELLOW);
+	glcd_plotstringwithfont(x, y, "HalloeQxqpjKklmnoy", GLCD_COLOR_PINK, GLCD_STRING_NORMAL);
+
+
+
+	glcd_plotcircle(xleft, yupper, 5, GLCD_COLOR_ORANGE);
+	glcd_plotcircle(x, y, 5, GLCD_COLOR_BLUE);
+
+//	x = 100; y = 150;
+//
+//	glcd_plotcharwithfont(x, y, 'M', GLCD_COLOR_PINK);
+//	glcd_getcharsizewithfont(x, y, 'M', &xleft, &yupper, &w, &h);
+//	glcd_plotrect(xleft, yupper, w, h, GLCD_COLOR_YELLOW);
+
+	glcd_setfont(NULL);
+
+	glcd_delay_ms(100);
 
 	while (1) {
-//
-//		p = touchscreen_pressure();
-//
-//		x  = touchscreen_readrawx();
-//		xc = touchscreen_map(x, TOUCH_LEFT, TOUCH_RIGHT, 0, glcd_getwidth());
-//		y = touchscreen_readrawy();
-//		yc = touchscreen_map(y, TOUCH_BOTTOM, TOUCH_TOP, 0, glcd_getheight());
-//
-////		snprintf(buffer, sizeof buffer, "x = %4lu, y = %4lu, %4lu\r", x, y, p);
-////		glcd_puts(buffer);
-//		snprintf(buffer, sizeof buffer, "x = %4ld, y = %4ld, %4lu\r", xc, yc, p);
-//		glcd_puts(buffer);
-////		glcd_plotpixel(100, 100, GLCD_COLOR_YELLOW);
-////		glcd_terminate_write();
-//		glcd_delay_ms(1);
-
-
+		p = touchscreen_pressure();
+		if (touchscreen_ispressed(p)) {
+			break;
+		}
 	}
-
-
-
 
 
 }
-#endif
+
