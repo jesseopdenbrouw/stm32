@@ -1148,7 +1148,7 @@ Note: make sure that the maximum clock frequency is not exceeded. Consult the mi
 To read the current raw X position, use:
 
 \begin{lstlisting}
-uint32_t touchscreen_readrawx(void);
+int32_t touchscreen_readrawx(void);
 \end{lstlisting}
 
 Note: this value is only of interest if the touchscreen is pressed\\
@@ -1160,7 +1160,7 @@ Note: this function will return 0 if no ADC is set up.
 To read the current raw y position, use:
 
 \begin{lstlisting}
-uint32_t touchscreen_readrawy(void);
+int32_t touchscreen_readrawy(void);
 \end{lstlisting}
 
 Note: this value is only of interest if the touchscreen is pressed\\
@@ -1172,7 +1172,7 @@ Note: this function will return 0 if no ADC is set up.
 To read the raw pressure, use:
 
 \begin{lstlisting}
-uint32_t touchscreen_pressure(void);
+int32_t touchscreen_pressure(void);
 \end{lstlisting}
 
 Note: if the touchscreen is \textbf{not} pressed this functions returns a small number, typically 0. Any other values means that the touchscreen is pressed.\\
@@ -1184,11 +1184,11 @@ Note: this function will return 0 if no ADC is set up.
 To map raw X and Y values to display coordinates, use:
 
 \begin{lstlisting}
-int32_t touchscreen_map(uint32_t value,
-                        uint32_t tlow,
-                        uint32_t thigh,
-                        uint32_t slow,
-                        uint32_t shigh);
+int32_t touchscreen_map(int32_t value,
+                        int32_t tlow,
+                        int32_t thigh,
+                        int32_t slow,
+                        int32_t shigh);
 \end{lstlisting}
 
 Note: \lstinline|value| is the raw value from X or Y\\
@@ -1197,7 +1197,7 @@ Note: \lstinline|thigh| is highest raw touchscreen value (X or Y)\\
 Note: \lstinline|slow| is lowest GLCD display value (X or Y)\\
 Note: \lstinline|shigh| is highest GLCD display value (X or Y)
 
-Note: you can calibrated the touchscreen, see $\S$~\ref{sec:calibrating}.
+Note: you can calibrate the touchscreen, see $\S$~\ref{sec:calibrating}.
 
 Note: the returned value can be negative. This is an indication that the touchscreen is not calibrated correctly.\\
 Note: this function internally uses floats to do the calculations. This will be done using the onboard FPU.
@@ -1244,7 +1244,7 @@ Note: the ADC speed is set to the lowest value possible. If you want to change t
 To test whether the screen is touched, use:
 
 \begin{lstlisting}
-uint32_t touchscreen_ispressed(uint32_t p);
+uint32_t touchscreen_ispressed(int32_t p);
 \end{lstlisting}
 
 Note: \lstinline|p| is the raw pressure value
@@ -1260,7 +1260,7 @@ Of course, the touchscreen cannot be physically rotated, so you have to use soft
 When the display is rotated 0$^\circ$, use:
 
 \begin{lstlisting}
-uint16_t raw;
+int16_t raw;
 int16_t x, y;
 
 raw = touchscreen_readrawx();
@@ -1273,7 +1273,7 @@ y = touchscreen_map(raw, TOUCH_BOTTOM, TOUCH_TOP, 0, glcd_getheight());
 When the display is rotated 90$^\circ$, use:
 
 \begin{lstlisting}
-uint16_t raw;
+int16_t raw;
 int16_t x, y;
 
 raw = touchscreen_readrawx();
@@ -1289,7 +1289,7 @@ Note the swapped \lstinline|x| and \lstinline|y|, and the swapped \lstinline|glc
 When the display is rotated 180$^\circ$, use:
 
 \begin{lstlisting}
-uint16_t raw;
+int16_t raw;
 int16_t x, y;
 
 raw = touchscreen_readrawx();
@@ -1304,7 +1304,7 @@ y = glcd_getheight() - touchscreen_map(raw, TOUCH_BOTTOM, TOUCH_TOP,
 When the display is rotated 270$^\circ$, use:
 
 \begin{lstlisting}
-uint16_t raw;
+int16_t raw;
 int16_t x, y;
 
 raw = touchscreen_readrawx();
@@ -1337,11 +1337,11 @@ Note all values must be within the values 0 to 1023 (inclusive).
 Reading raw values is done by oversamping and then the mean of the samples is returned. You can set the number of samples using the define \lstinline|TOUCH_SAMPLES|. The default value is 16. This value must be 2 or greater. Lower values speed up the reading of the touchscreen.
 
 \subsection{Using the touchscreen ADC for reading analog values}
-Some STM32F4s only have one ADC (such as the STM32F411), so you need the touchscreen ADC to do your readings. Here are some rules to obey:
+Some STM32F4s only have one ADC (such as the STM32F411), so you need the touchscreen ADC to do your other analog readings. Here are some rules to obey:
 
 \begin{itemize}
 \item Never ever disable the ADC, the ADC is enabled only once by \lstinline|touchscreen_init|;
-\item You can change the conversion speed with \lstinline|touchscreen_setadcspeed|, see $\S$~\ref{sec:setadcspeed}. This will affect all ADCs. The speed is not set back to the original value. Note that if the speed is set too high, the touchscreen functions will not function correctly;
+\item You can change the ADC clock speed with \lstinline|touchscreen_setadcspeed|, see $\S$~\ref{sec:setadcspeed}. This will affect all ADCs. The speed is not set back to the original value. Note that if the speed is set too high, the touchscreen functions will not function correctly;
 \item Before conversion, you can set the desired resolution. The touchscreen functions will set it back to 10 bits;
 \item The sampling period is set to 3 ADC clockpulses. You may change it to your desired period. The touchscreen functions will not set it back. That is not a problem, only the touchscreen conversion will be slower;
 \item Don't set any of the trigger modes on the ADC, leave it to software enabled triggering;
@@ -1352,7 +1352,7 @@ Some STM32F4s only have one ADC (such as the STM32F411), so you need the touchsc
 \section{Debugging or production use}
 If you need to debug the functions, set the compiler optimization to \lstinline|-O0| (no optimization) or \lstinline|-Og| (optimize for debug). If you want to exhibit full speed support set the optimization to \lstinline|-Ofast|. If you need the smallest ROM footprint and have some speed over \lstinline|-O0|, set the optimization to \lstinline|-Os|.
 
-If you need mathematical functions in conbination of the display, use \lstinline|float|s and the \lstinline|float| forms of the functions (like \lstinline|sinf| and \lstinline|cosf|). This will use the onboard FPU. \lstinline|float|s have 6 significant digits, which is more that enough for GLCD functions. If you use \lstinline|double|s, all calculations will be done with software.
+If you need mathematical functions in combination of the display, use \lstinline|float|s and the \lstinline|float| forms of the functions (like \lstinline|sinf| and \lstinline|cosf|). This will use the onboard FPU. \lstinline|float|s have 6 significant digits, which is more that enough for GLCD functions. Make sure that all floating constants are followed by an \lstinline|f|, like \lstinline|0.5f|. If you use \lstinline|double|s, all calculations will be done with software.
 
 \section{Nice tricks}
 To wait until the touchscreen is touched, use one of
