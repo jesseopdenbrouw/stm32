@@ -75,7 +75,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #define HAVE_DOG
 
 /* For testing purposes, if you know what your're doing */
-#define USE_TEST
+//#define USE_TEST
 
 
 #ifdef MEASUREMENT
