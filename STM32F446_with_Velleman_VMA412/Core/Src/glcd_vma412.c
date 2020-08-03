@@ -1070,11 +1070,24 @@ void glcd_plothorizontalline(int16_t x, int16_t y, int16_t w, glcd_color_t color
 	register uint16_t i;
 	register glcd_buffer_t red, green, blue;
 
+	/* y coordinate outside display? Nothing to draw anyway */
+	if (y<0 || y>=glcd_height) {
+		return;
+	}
+
+	if (w<0) {
+		/* w is negative, reposition x and make w positive */
+		x = x + w;
+		w = -w;
+	}
+	/* Clip x left */
 	if (x<0) {
+		w = w + x;
 		x = 0;
 	}
-	if (y<0) {
-		y = 0;
+	/* Clip right */
+	if (x+w>glcd_width) {
+		w=glcd_width-x;
 	}
 
 	red   = (color>>16)&0xff;
@@ -1095,9 +1108,6 @@ void glcd_plothorizontalline(int16_t x, int16_t y, int16_t w, glcd_color_t color
 	glcd_data[3] = (glcd_height-1)&0xff; //0xef;
 	glcd_write(0x2b, 4, glcd_data);
 
-	if (x+w>glcd_width) {
-		w=glcd_width-x;
-	}
 	/* Create color */
 	for (i=0; i<3*w; i=i+3) {
 		glcd_data[i] = red;
@@ -1121,11 +1131,24 @@ void glcd_plotverticalline(int16_t x, int16_t y, int16_t h, glcd_color_t color) 
 	register uint16_t i;
 	register glcd_buffer_t red, green, blue;
 
-	if (x<0) {
-		x = 0;
+	/* x coordinate outside display? Nothing to draw anyway */
+	if (x<0 || x>=glcd_width) {
+		return;
 	}
+
+	if (h<0) {
+		/* h is negative, reposition y and make h positive */
+		y = y + h;
+		h = -h;
+	}
+	/* Clip y top */
 	if (y<0) {
+		h = h + y;
 		y = 0;
+	}
+	/* Clip y bottom */
+	if (y+h>glcd_height) {
+		h=glcd_height-y;
 	}
 
 	red   = (color>>16)&0xff;
@@ -1633,7 +1656,7 @@ void glcd_plotline(int16_t x0, int16_t y0, int16_t x1, int16_t y1, glcd_color_t 
  */
 void glcd_plotregularpolygon(int16_t xc, int16_t yc, int16_t r, int16_t sides, float displ, glcd_color_t color) {
 
-	uint16_t xp, yp, xlast, ylast, xs, ys;
+	int16_t xp, yp, xlast, ylast, xs, ys;
 
 	const float twopidiv = 6.283185307179586476925286766559f/(float)sides;
 	const float angle = displ / 57.295779513082320876798f;
@@ -1686,7 +1709,7 @@ void glcd_plotregularpolygon(int16_t xc, int16_t yc, int16_t r, int16_t sides, f
  */
 void glcd_plotregularpolygonfill(int16_t xc, int16_t yc, int16_t r, int16_t sides, float displ, glcd_color_t color) {
 
-	uint16_t xp, yp, xlast, ylast, xs, ys;
+	int16_t xp, yp, xlast, ylast, xs, ys;
 
 	const float twopidiv = 6.283185307179586476925286766559f/(float)sides;
 	const float angle = displ / 57.295779513082320876798f;
@@ -2009,10 +2032,19 @@ void glcd_plotarc(int16_t xc, int16_t yc, int16_t r, float start, float stop, gl
 	/* Really should be arctan(1/r), but is almost equal for r >> 1 */
 	register float inc_angle = 1.0f / (float)r;
 	register float f;
-	register uint16_t x, y;
+	register int16_t x, y;
 
 	if (r<0) {
 		return;
+	}
+
+	/* Exchange start and stop */
+	if (stop < start) {
+		float temp;
+
+		temp = start;
+		start = stop;
+		stop = temp;
 	}
 
 	/* Change to radians */
