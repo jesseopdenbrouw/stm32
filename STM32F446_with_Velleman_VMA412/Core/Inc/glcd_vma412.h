@@ -7,8 +7,8 @@
 
 Software License Agreement (BSD License)
 
-Version: 0.1rc5
-Date: 2020/08/03
+Version: 0.1rc6
+Date: 2020/08/09
 
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
@@ -48,8 +48,10 @@ extern "C"
 
 #include <stdint.h>
 
+#include "stm32f4xx_hal.h"
+
 /* Driver version */
-#define GLCD_VERSION "STM32 VMA412 GLCD Driver v 0.1rc5 (Aug 3 2020)"
+#define GLCD_VERSION "STM32 VMA412 GLCD Driver v 0.1rc6 (Aug 9 2020)"
 
 
 /* From here on, user can change settings */
