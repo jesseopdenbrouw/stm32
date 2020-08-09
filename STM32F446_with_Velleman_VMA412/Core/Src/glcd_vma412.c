@@ -7,8 +7,8 @@
 
 Software License Agreement (BSD License)
 
-Version: 0.1rc5
-Date: 2020/08/03
+Version: 0.1rc6
+Date: 2020/08/09
 
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
@@ -48,7 +48,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <math.h>
 #include <stdint.h>
 
-#include "main.h"
+#include "stm32f4xx_hal.h"
 #include "glcd_vma412.h"
 
 /* Special to signal a delay in ms */
