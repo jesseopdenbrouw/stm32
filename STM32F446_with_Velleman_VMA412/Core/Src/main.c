@@ -142,9 +142,11 @@ void test(void);
 extern const uint8_t dog_map[];
 #endif
 
+#ifdef GLCD_HAVE_THUAS_BITMAPS
 /* Use the THUAS bitmaps */
 extern const uint8_t glcd_thuas_map[];
 extern const uint8_t glcd_thuas_small_map[];
+#endif
 
 /* Use alternate fonts */
 extern const GFXfont FreeSerif12pt7b;
@@ -337,6 +339,8 @@ void demo_touchscreen(void) {
 	uint32_t xraw, yraw, p;
 	int32_t x, y;
 
+	uint32_t touched = 0;
+
 	glcd_puts("\fTouch rectangle on the right to exit");
 	glcd_plotrectfill(glcd_getwidth()-20, 0, 20, 20, GLCD_COLOR_WHITE);
 
@@ -349,20 +353,41 @@ void demo_touchscreen(void) {
 
 	/* Now read in x and y and pressure */
 	while (1) {
-		/* Read raw X coordinate and map it to screen coordinate */
-		xraw = touchscreen_readrawx();
-		x = touchscreen_map(xraw, TOUCH_LEFT, TOUCH_RIGHT, 0, glcd_getwidth());
 
-		/* Read raw Y coordinate and map it to screen coordinate */
-		yraw = touchscreen_readrawy();
-		y = touchscreen_map(yraw, TOUCH_BOTTOM, TOUCH_TOP, 0, glcd_getheight());
+		if (touched == 0) {
+			/* Read raw pressure, X and Y */
+			p = touchscreen_pressure();
+			xraw = touchscreen_readrawx();
+			yraw = touchscreen_readrawy();
 
-		/* Read raw pressure */
-		p = touchscreen_pressure();
+			/* Map to screen coordinates */
+			x = touchscreen_map(xraw, TOUCH_LEFT, TOUCH_RIGHT, 0, glcd_getwidth());
+			y = touchscreen_map(yraw, TOUCH_BOTTOM, TOUCH_TOP, 0, glcd_getheight());
+
+			if (touchscreen_ispressed(p)) {
+				/* Pressed before x and y are read, so valid (hopefully) */
+				touched = 1;
+			}
+		} else { /* touched == 1 */
+
+			/* Read raw X, Y and pressure */
+			xraw = touchscreen_readrawx();
+			yraw = touchscreen_readrawy();
+			p = touchscreen_pressure();
+
+			/* Map to screen coordinates */
+			x = touchscreen_map(xraw, TOUCH_LEFT, TOUCH_RIGHT, 0, glcd_getwidth());
+			y = touchscreen_map(yraw, TOUCH_BOTTOM, TOUCH_TOP, 0, glcd_getheight());
+
+			if (!touchscreen_ispressed(p)) {
+				/* Unpressed  after x and y are read, so invalid (hopefully) */
+				touched = 0;
+			}
+		}
 
 		color += 0x010104;
 
-		if (touchscreen_ispressed(p)) {
+		if (touched) {
 			/* Touched in the upper right corner? Then clear screen */
 			if (x>glcd_getwidth()-20 && y<20) {
 				break;
@@ -522,6 +547,7 @@ void demo_glcd(void) {
 
 	glcd_delay_ms(5000);
 
+#ifdef GLCD_USE_ALTERNATIVE_FONTS
 	/* Now for some alternative fonts */
 	glcd_cls(GLCD_COLOR_MAROON);
 
@@ -547,7 +573,7 @@ void demo_glcd(void) {
 	glcd_setfont(NULL);
 
 	glcd_delay_ms(5000);
-
+#endif
 
 	/* Console based printing */
 	glcd_puts("\fConsole based printing");
@@ -591,7 +617,11 @@ void demo_glcd(void) {
 	/* Plot the THUAS bitmap */
 	glcd_cls(GLCD_COLOR_WHITE);
 	START_CLOCK();
+#ifdef GLCD_HAVE_THUAS_BITMAPS
 	glcd_plotbitmap(0, 72, glcd_thuas_map, 320, 96, GLCD_COLOR_THUASGREEN, GLCD_COLOR_WHITE);
+#else
+	glcd_plotstring(100, 120, "Plotting THUAS bitmap disabled!", GLCD_COLOR_THUASGREEN, GLCD_COLOR_WHITE, GLCD_STRING_NORMAL);
+#endif
 	GET_CLOCK(15);
 	//glcd_plotbitmap(0, 0, GLCD_THUAS_DEFAULT_BITMAP_SMALL, 160, 48, GLCD_COLOR_THUASGREEN, GLCD_COLOR_WHITE);
 	glcd_plotstring(100, 200, "Department of Electrical Engineering", GLCD_COLOR_THUASGREEN, GLCD_COLOR_WHITE, GLCD_STRING_NORMAL);
