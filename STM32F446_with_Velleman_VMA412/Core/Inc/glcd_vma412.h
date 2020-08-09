@@ -166,7 +166,8 @@ typedef enum {GLCD_KEEP_DATA_OUTPUT, GLCD_MAKE_DATA_INPUT} glcd_dir_t;
 		b = t;                                                                     \
 	}
 
-#ifdef GLCD_USE_ALTERNATIVE_FONTS
+//#ifdef GLCD_USE_ALTERNATIVE_FONTS
+// Even if the alternative fonts are not used, define the structs...
 /* From the Adafruit library, for using custom fonts */
 // Font data stored PER GLYPH
 typedef struct GFXglyph_struct{
@@ -186,7 +187,7 @@ typedef struct GFXfont_struct {
   uint16_t last;    ///< ASCII extents (last char)
   uint8_t yAdvance; ///< Newline distance (y axis)
 } GFXfont;
-#endif
+//#endif
 
 /* Low level commands
  * These command are normally not needed by the user
