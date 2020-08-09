@@ -7,8 +7,8 @@
 
 Software License Agreement (BSD License)
 
-Version: 0.1rc5
-Date: 2020/08/03
+Version: 0.1rc6
+Date: 2020/08/09
 
 Copyright (c) 2020 Jesse op den Brouw.  All rights reserved.
 
@@ -38,14 +38,13 @@ POSSIBILITY OF SUCH DAMAGE.
 
  */
 
-
-#include "main.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <limits.h>
 #include <stdint.h>
 
+#include "stm32f4xx_hal.h"
 #include "touchscreen_vma412.h"
 
 /* GPIO A(1), B(2), C(4) USED */
