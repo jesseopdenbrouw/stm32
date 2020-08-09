@@ -24,7 +24,7 @@
 \usepackage{parskip}
 \usepackage[charter]{mathdesign}
 \usepackage{nimbusmono}
-\usepackage[margin=1in]{geometry}
+\usepackage[a4paper,margin=1in]{geometry}
 \usepackage{graphicx}
 %\usepackage{tocloft}
 %\setlength\cftsubsecnumwidth{3.5em}
@@ -57,7 +57,6 @@
 
 
 \begin{document}
-
 \raggedbottom
 \maketitle
 
@@ -641,8 +640,8 @@ void glcd_plotregularpolygonfill(int16_t xc,           // center x
                                  int16_t yc,           // center y
                                  int16_t r,            // radius
                                  int16_t sides,        // number of sides
-                                 float displ,           // angle displacement
-                                 glcd_color_t color);   // color
+                                 float displ,          // angle displacement
+                                 glcd_color_t color);  // color
 \end{lstlisting}
 
 Note: see $\S$~\ref{sec:regpoly}.\\
@@ -986,7 +985,7 @@ There are a number of \lstinline|#define|'s that can be manipulated to taylor th
 \end{lstlisting}
 
 Define \lstinline|GLCD_USE_FLOOD_FILL| if you need to (flood) fill objects, undefine to save ROM  and RAM resources. If you use flood fill, set the stack size \lstinline|GLCD_STACK_SIZE| to an appropriate size. While testing or debugging, define \lstinline|GLCD_USE_FLOOD_FILL_PRINT_IF_STACK_OVERFLOW|. This will print warning messages if there is a stack overflow when filling objects. Undefine if you are sure there will be no stack overflow. Define \lstinline|GLCD_USE_ARC| if you need to plot arcs, undefine to save ROM resources, especially the math library functions for \lstinline|sinf| and \lstinline|cosf|. Plotting arcs use the onboard FPU for sine and cosine calculations. Define \lstinline|GLCD_USE_REGULAR_POLYGON| if you need to plot regular polygons, undefine to save ROM resources, especially the math library functions for \lstinline|sinf| and \lstinline|cosf|. Plotting regular polygons use the onboard FPU for sine and cosine calculations. Define \lstinline|GLCD_CHARACTERS_IN_RAM| to place the character table in RAM. This way you can change the layout of characters by changing the bit patterns (but of course it uses extra RAM). Define \lstinline|GLCD_HAVE_THUAS_BITMAPS| if you need the buildin THUAS logos (you probably won't need them).
-Define \lstinline|GLCD_USE_ALTERNATIVE_FONTS| if you need the Adafruit based fonts.
+Define the macro \lstinline|GLCD_USE_ALTERNATIVE_FONTS| if you need the Adafruit based fonts.
 
 Leave \lstinline|GLCD_WIDTH| and \lstinline|GLCD_HEIGHT| to their respective values.
 
@@ -1069,10 +1068,10 @@ int16_t x=30, y=100;
 int16_t xleft, yupper, w, h;
 
 glcd_plotstringwithfont(x, y, "Hello", GLCD_COLOR_PINK,
-                                                   GLCD_STRING_NORMAL);
+                                               GLCD_STRING_NORMAL);
 
 glcd_getstringsizewithfont(x, y, "Hello", &xleft, &yupper, &w, &h,
-                                                   GLCD_STRING_NORMAL);
+                                               GLCD_STRING_NORMAL);
 \end{lstlisting}
 
 Now you can plot a rectangle \textsl{over} the string with:
@@ -1217,7 +1216,14 @@ slope = \frac{shigh-slow}{thigh-tlow}\qquad\qquad(thigh \neq tlow)
 and $offset$ is
 
 \begin{equation}
-offset = \frac{slow(thigh-tlow)-tlow}{thigh-tlow}
+%offset = \frac{slow(thigh-tlow)-tlow}{thigh-tlow}
+offset = slow - slope\cdot tlow
+\end{equation}
+
+Rearranging the variables yields:
+
+\begin{equation}
+returned\ value = \frac{shigh-slow}{thigh-tlow}(value - tlow) + slow
 \end{equation}
 
 Note: if $thigh = tlow$ the value \lstinline|INT_MIN| is returned, because division by 0 is not possible.
@@ -1321,10 +1327,78 @@ Note: the pressure is not affected by the rotation.
 
 Note: in Arduino based software, the touchscreen is not rotated by software, and you need to rotate the values of X and Y yourself. Set up the touchscreen for 90$^\circ$ rotation.
 
+\subsection{Properly reading raw X, Y and pressure}
+Make sure that you read the raw X, Y and pressure values properly. There are race conditions possible, because there is some time between the readings. For example, let's assume that the touchscreen is not pressed. Reading X and Y \textsl{before} the pressure may cause problems as explained in the following code snippet.
+
+\begin{lstlisting}
+/* Note: this code has race conditions, do not use */
+...
+/* Touchscreen is not pressed */
+x = touchscreen_readrawx();
+y = touchscreen_readrawy();
+/* Now at this point, the touchscreen is pressed */
+p = touchscreen_pressure();
+\end{lstlisting}
+
+The X and Y values were read before the touchscreen was pressed and contain garbage values but the pressure is valid. So the best way is to first read the pressure and then read X and Y. If the touchscreen was pressed, X and Y are bound to contain valid raw values. See code snippet.
+
+\begin{lstlisting}
+/* Note: this code has race conditions, do not use */
+...
+/* At this point, the touchscreen is pressed */
+p = touchscreen_pressure();
+/* Now at this point. the touchscreen is not pressed */
+x = touchscreen_readrawx();
+y = touchscreen_readrawy();
+\end{lstlisting}
+
+But now there is a problem when untouching the touchscreen, because it is untouched before reading X and Y, so the pressure is valid, but X and Y are not.
+
+The best way to cope with these problems is to use a variable to track if the touchscreen is pressed or not. Based on the contents of the variable we read X and Y before or after reading the pressure. See the code snippet below.
+
+\begin{lstlisting}
+uint32_t touched = 0;
+
+if (touched == 0) {
+    /* Read raw pressure, X and Y */
+    p = touchscreen_pressure();
+    xraw = touchscreen_readrawx();
+    yraw = touchscreen_readrawy();
+    x = touchscreen_map(xraw, TOUCH_LEFT, TOUCH_RIGHT, 0, glcd_getwidth());
+    y = touchscreen_map(yraw, TOUCH_BOTTOM, TOUCH_TOP, 0, glcd_getheight());
+
+    if (touchscreen_ispressed(p)) {
+        /* Pressed before x and y are read, so valid (hopefully) */
+        touched = 1;
+    }
+} else { /* touched == 1 */
+
+    /* Read raw X, Y and pressure */
+    xraw = touchscreen_readrawx();
+    yraw = touchscreen_readrawy();
+    p = touchscreen_pressure();
+
+    x = touchscreen_map(xraw, TOUCH_LEFT, TOUCH_RIGHT, 0, glcd_getwidth());
+    y = touchscreen_map(yraw, TOUCH_BOTTOM, TOUCH_TOP, 0, glcd_getheight());
+
+    if (!touchscreen_ispressed(p)) {
+        /* Unpressed  after x and y are read, so invalid (hopefully) */
+        touched = 0;
+    }
+}
+
+if (touched) {
+    /* Do your thing here */
+}
+\end{lstlisting}
+
+Now there is still a small posibility that the raw X and Y values are invalid, but then you have to be very fast, because reading the pressure takes about 60 $\mu$s at 180 MHz (see $\S$~\ref{sec:tstidi}).
+
+
 \subsection{Calibrating the touchscreen}
 \index{Calibrating touchscreen}
 \label{sec:calibrating}
-The touchscreen of the Velleman VMA412 is constructed of resistive foils. Normally the resistance and hence the voltage measured is linear propotional to the location where the touchscreen is pressed. Small deficienties during fabrication produce differences between samples of the touchscreen. To compensatie for that, calibration is needed. There are a number of \lstinline|#define|'s to calibrate the touchscreen. These can be found in \lstinline|touchscreen_vma412.h|.
+The touchscreen of the Velleman VMA412 is constructed of resistive foils. Normally the resistance and hence the voltage measured is linear propotional to the location where the touchscreen is pressed. Small deficienties during fabrication produce differences between samples of the touchscreen. To compensatie for that, calibration is needed. There are a number of \lstinline|#define|'s to calibrate the touchscreen. These can be found in the header file \lstinline|touchscreen_vma412.h|.
 
 The outer left raw position is set with \lstinline|TOUCH_LEFT|. The outer right raw position is set with \lstinline|TOUCH_RIGHT|. The outer top raw position is set with \lstinline|TOUCH_TOP|. The outer bottom raw position is set with \lstinline|TOUCH_BOTTOM|.
 
@@ -1332,7 +1406,7 @@ Whether the touchscreen is pressed or not is calculated according to raw touchsc
 
 Please note when porting Arduino based software: the ADCs are a bit more itchy when reading analog values, probably because of a different electric analog input hardware, so make \lstinline|TOUCH_PRESSURE_LOW| higher than in Arduino based software. A value of 100 is a good start.
 
-Note all values must be within the values 0 to 1023 (inclusive).
+Note: all values must be within the values 0 to 1023 (inclusive).
 
 Reading raw values is done by oversamping and then the mean of the samples is returned. You can set the number of samples using the define \lstinline|TOUCH_SAMPLES|. The default value is 16. This value must be 2 or greater. Lower values speed up the reading of the touchscreen.
 
@@ -1405,10 +1479,9 @@ The VMA412 uses 13 pins to do its job. Nearly all of the Arduino compatible pins
 
 
 \section{Some details}
-In this section some details about the functioning of the VMA412 are discussed. It gives you some information is you want to experiment yourself.
+In this section some details about the functioning of the VMA412 using a STM32F446 at 180 MHz are discussed. It gives you some information if you want to experiment yourself. 
 
 The VMA412 uses the ILI9431's 8-bit databus connection, which is called the 8080 type I connection. This is a reference to the old days, when the much-used Intel 8080 microprocessor was used. The VMA12 needs 8 pins for data exchange. There are 5 additions pins needed to guide the information exchange. They are: RST, (hardware reset, active low), CS (chip select, active low), data/command (D/C, bi-valued), write (WR, active low) and RD (read, active low). See Table~\ref{tab:1}. In this table the touchscreen pins are also shown.
-
 
 \begin{table}[!ht]
 \centering
@@ -1485,6 +1558,7 @@ In this setup, the write pulse delay is about 96 ns and the read pulse delay is 
 
 
 \subsection{Touchscreen timing diagrams}
+\label{sec:tstidi}
 The touchscreen is constructed with resistive foils, commenly named \textsl{plates}. As seen from the VMA412, the widest plate is called the x plate and de smaller plate is called the y plate. Because Arduino based software rotates the display 90$^\circ$ counter clockwise, x and y are swapped on these platforms.
 
 Reading the x and y touched positions involves activating the plate to be read and then sample an analog voltage which indicates the point of touching. This is in electronic science called a \textsl{voltage divider}.
@@ -1522,7 +1596,7 @@ Reading the pressure is more tricky, because there no plate for reading this val
 
 Because of the analog circuitry, after setting up the voltage across a plate, the analog inputs have to stabilize for about 400 to 800 ns. This is done automatically by the library.
 
-When the raw values have read in from the analog inputs, you have to map these values to display coordinates. This is done by the function \lstinline|touchscreen_map| (see~$\S$~\ref{sec:touchmap}). First you have to figure out the minimum and maximum of the raw x and y values. The values have to be assigned to \lstinline|TOUCH_LEFT|, \lstinline|TOUCH_RIGHT|, \lstinline|TOUCH_TOP| and \lstinline|TOUCH_BOTTOM|. For deciding if the touchscreen is pressed you have to assign \lstinline|TOUCH_PRESSURE_LOW| and \lstinline|TOUCH_PRESSURE_HIGH|. A value below \lstinline|TOUCH_PRESSURE_LOW| or above \lstinline|TOUCH_PRESSURE_HIGH| is considered that the touchscreen is not pressed. The default values will suffice for most VMA412's.
+When the raw values have read in from the analog inputs, you have to map these values to display coordinates. This is done by the function \lstinline|touchscreen_map| (see~$\S$~\ref{sec:touchmap}). First you have to figure out the minimum and maximum of the raw x and y values. The values have to be assigned to \lstinline|TOUCH_LEFT|, \lstinline|TOUCH_RIGHT|, \lstinline|TOUCH_TOP| and \lstinline|TOUCH_BOTTOM|. For deciding if the touchscreen is pressed you have to assign \lstinline|TOUCH_PRESSURE_LOW| and \lstinline|TOUCH_PRESSURE_HIGH|. A value between \lstinline|TOUCH_PRESSURE_LOW| and \lstinline|TOUCH_PRESSURE_HIGH| (inclusive) is considered that the touchscreen is pressed. The default values will suffice for most VMA412's.
 
 
 \section{Library size}
@@ -1534,7 +1608,7 @@ Some todo's left:
 \begin{itemize}
 \item Exchange display top/bottom or left/right (not rotating);
 \item Make C++ wrappers;
-\item Make C++ wrappers for AdaFruit based software (mostly Arduino sketches). This will be a separate project. This should minimize porting Arduino based software. One problem is that some functions are currently not implemented in this library. Also the Arduino based software rotates the display 90$^\circ$ with respect to this library, and swap X and Y readings from the touchscreen.
+\item Make C++ wrappers for AdaFruit based software (mostly Arduino sketches). This will be a separate project. This should minimize porting Arduino based software. One problem is that some functions are currently not implemented in this library. Also the Arduino based software rotates the display 90$^\circ$ with respect to this library, swap X and Y readings from the touchscreen, and loads a low level hardware library.
 \item High-level touchscreen X and Y read functions (needs rotation information \textsl{and} GLCD functions for getting width and height);
 \item Make code files Doxygen-proof;
 \end{itemize}
