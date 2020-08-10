@@ -200,8 +200,7 @@ This section discusses all functions for the Graphic LCD.
 
 \subsection{X and Y coordinates, display orientation}
 \index{Coordinate system}\index{Display orientation}
-The X and Y coordinates use type \lstinline|int16_t| for their values, because some plotting functions involve negative values. Of course, real display coordinates only have positive values, or 0, and negative values for X or Y prohibit (partially) plotting. The display is set up in landscape where \lstinline|X| is between 0 and 319 and \lstinline|y| is between 0 and 239. Point (0,0) is in the upper left corner,
-point (239,319) is in the lower right corner. The landscape orientation is with the SD-card socket to the right.
+The X and Y coordinates use type \lstinline|int16_t| for their values, because some plotting functions involve negative values. Of course, real display coordinates only have positive values, or 0, and negative values for X or Y prohibit (partially) plotting. The display is set up in landscape where X is between 0 and 319 and Y is between 0 and 239. Point (0,0) is in the upper left corner, point (319,239) is in the lower right corner. The landscape orientation is with the SD-card socket to the right.
 The display orientation can be changed, see $\S$~\ref{sec:rotdispl}.
 
 \subsection{Other parameters}
@@ -1394,6 +1393,7 @@ if (touched) {
 
 Now there is still a small posibility that the raw X and Y values are invalid, but then you have to be very fast, because reading the pressure takes about 60 $\mu$s at 180 MHz (see $\S$~\ref{sec:tstidi}).
 
+Note: to keep the variable \lstinline|touched| in sync with the physical touching or untouching, this code snippet has to be executed very frequently.
 
 \subsection{Calibrating the touchscreen}
 \index{Calibrating touchscreen}
@@ -1564,7 +1564,7 @@ The touchscreen is constructed with resistive foils, commenly named \textsl{plat
 Reading the x and y touched positions involves activating the plate to be read and then sample an analog voltage which indicates the point of touching. This is in electronic science called a \textsl{voltage divider}.
 
 \subsubsection{Reading raw x}
-To read the raw x position, XP is set high (about~3.3~V) and XM is set low (0~V). Then the voltage is read from YM. A low (digital) value indicates that the point of touching is more on the left (as positioned on the STM32) and a high (digital) value indicates that the point of touching is on the right. This value is an \textsl{indication} of where the plate is touched so you have to calculate the real display x coordinate. A sample of reading the raw x value is shown in Figure~\ref{fig:21}. Reading the raw X value takes about 30 $\mu$s because it is sampled 16 times (default) and the the mean of the samples is returned as digital value. Note that the mean is \textsl{not} the same as the average. Also, after reading the x value, a pixel is writte to the display to show the CS line is low. (This was needed to trigger the oscilloscope correctly.)
+To read the raw x position, XP is set high (about~3.3~V) and XM is set low (0~V). Then the voltage is read from YM. A low (digital) value indicates that the point of touching is more on the left (as positioned on the STM32) and a high (digital) value indicates that the point of touching is on the right. This value is an \textsl{indication} of where the plate is touched so you have to calculate the real display x coordinate. A sample of reading the raw x value is shown in Figure~\ref{fig:21}. Reading the raw X value takes about 30 $\mu$s because it is sampled 16 times (default) and the the mean of the samples is returned as digital value. Note that the mean is \textsl{not} the same as the average. Also, after reading the x value, a pixel is written to the display to show the CS line is low. (This was needed to trigger the oscilloscope correctly.)
 
 \begin{figure}[!ht]
 \centering
@@ -1596,7 +1596,7 @@ Reading the pressure is more tricky, because there no plate for reading this val
 
 Because of the analog circuitry, after setting up the voltage across a plate, the analog inputs have to stabilize for about 400 to 800 ns. This is done automatically by the library.
 
-When the raw values have read in from the analog inputs, you have to map these values to display coordinates. This is done by the function \lstinline|touchscreen_map| (see~$\S$~\ref{sec:touchmap}). First you have to figure out the minimum and maximum of the raw x and y values. The values have to be assigned to \lstinline|TOUCH_LEFT|, \lstinline|TOUCH_RIGHT|, \lstinline|TOUCH_TOP| and \lstinline|TOUCH_BOTTOM|. For deciding if the touchscreen is pressed you have to assign \lstinline|TOUCH_PRESSURE_LOW| and \lstinline|TOUCH_PRESSURE_HIGH|. A value between \lstinline|TOUCH_PRESSURE_LOW| and \lstinline|TOUCH_PRESSURE_HIGH| (inclusive) is considered that the touchscreen is pressed. The default values will suffice for most VMA412's.
+When the raw values have read in from the analog inputs, you have to map these values to display coordinates. This is done by the function \lstinline|touchscreen_map| (see~$\S$~\ref{sec:touchmap}). First you have to figure out the minimum and maximum of the raw x and y values. The values have to be assigned to \lstinline|TOUCH_LEFT|, \lstinline|TOUCH_RIGHT|, \lstinline|TOUCH_TOP| and \lstinline|TOUCH_BOTTOM|. For deciding if the touchscreen is pressed you have to assign \lstinline|TOUCH_PRESSURE_LOW| and \lstinline|TOUCH_PRESSURE_HIGH|. Values between \lstinline|TOUCH_PRESSURE_LOW| and \lstinline|TOUCH_PRESSURE_HIGH| (inclusive) are considered that the touchscreen is pressed. The default values will suffice for most VMA412's.
 
 
 \section{Library size}
