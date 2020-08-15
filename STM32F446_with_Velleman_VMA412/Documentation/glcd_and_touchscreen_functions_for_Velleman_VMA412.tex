@@ -1,7 +1,7 @@
 
 %%% glcd_and_touchscreen_functions_for_velleman_VMA412.tex
 %%%
-%%%   Documentation for version 0.1rc5
+%%%   Documentation for version 0.1rc6
 %%%
 %%%
 %%% Copyright 2020 J.E.J. op den BRouw
@@ -21,6 +21,7 @@
 
 \documentclass[12pt]{article}
 
+\def\version{Version 0.1rc6 (August 9, 2020)}
 \usepackage{parskip}
 \usepackage[charter]{mathdesign}
 \usepackage{nimbusmono}
@@ -51,9 +52,9 @@
 }
 
 
-\author{Version 0.1rc6\\[2ex]Jesse op den Brouw\thanks{Please mail me at: \href{mailto:J.E.J.opdenBrouw@hhs.nl}{J.E.J.opdenBrouw@hhs.nl}}\\The Hague University of Applied Sciences\\(THUAS)}
+\author{\version\\[2ex]Jesse op den Brouw\thanks{Please mail me at: \href{mailto:J.E.J.opdenBrouw@hhs.nl}{J.E.J.opdenBrouw@hhs.nl}}\\The Hague University of Applied Sciences\\(THUAS)}
 \title{Graphic LCD and Touchscreen Functions for Velleman VMA412 with ILI9341 Controller used with a STM32F446 Nucleo Board}
-\date{\today}
+\date{Documentation date: \today}
 
 
 \begin{document}
@@ -176,7 +177,7 @@ The files \lstinline|FreeMono12pt7b.c| and \lstinline|FreeSerif12pt7b.c| may be 
 
 
 \section{Running the demo}
-If you have set up your project just start compilation using \texttt{Project}$\rightarrow$\texttt{Build Project}. Then start the the demo using \texttt{Run}$\rightarrow$\texttt{Run}. The demo starts by asking you to touch one of four rectangles to start the GLCD demo, the touchscreen demo, the rotation demo or the character set demo, see Figure~\ref{fig:2}. At the end of the GLCD demo, there will be a list of running times for selected graphic functions as can be seen in Figure~\ref{fig:3}.
+If you have set up your project just start compilation using \texttt{Project}$\rightarrow$\texttt{Build Project}. Then start the the demo using \texttt{Run}$\rightarrow$\texttt{Run}. The demo starts by asking you to touch one of four rectangles (well, really they are squares) to start the GLCD demo, the touchscreen demo, the rotation demo or the character set demo, see Figure~\ref{fig:2}. At the end of the GLCD demo, there will be a list of running times for selected graphic functions as can be seen in Figure~\ref{fig:3}.
 
 \begin{figure}[!ht]
 \centering
@@ -192,8 +193,13 @@ If you have set up your project just start compilation using \texttt{Project}$\r
 \label{fig:3}
 \end{figure}
 
+As you can see from Figure~~\ref{fig:3}, the delay function is not calibrated properly. This is because the delay function is coded in assembly and is not using the SysTick timer. The SysTick timer is free for HAL-constrained functions. If you need better accuracy with the delay, you can set the divider to the appropriate value in \lstinline|glcd_vma412.c|. Find the line:
 
+\begin{lstlisting}
+prems = SystemCoreClock/3000UL+1UL;     /* factor for ms delay */
+\end{lstlisting} 
 
+Change the divider \lstinline|3000UL| to the correct value. In this case, the divider should be \lstinline|3068UL|. Please note that in the \textsl{demo}, the SysTick timer is used to measure the timings.
 
 \section{Graphic LCD}
 This section discusses all functions for the Graphic LCD.
@@ -463,6 +469,7 @@ void glcd_plotline(int16_t x0,            // x start point
 Note: the part of the line that is exceeding the dimensions of the display are not plotted.
 
 \subsubsection{Plot a rectangle}
+\label{sec:plotrect}
 \ifunc{glcd\_plotrect}
 To plot a rectangle, use:
 \begin{lstlisting}
@@ -473,7 +480,9 @@ void glcd_plotrect(int16_t x,              // x coordinate
                    glcd_color_t color);    // color
 \end{lstlisting}
 
-Note: \lstinline|x| and \lstinline|y| specify the upper left corner.
+Note: \lstinline|x| and \lstinline|y| specify the upper left corner.\\
+Note: pixels in excess to the dimensions of the screen are not plotted.
+
 
 \subsubsection{Plot a filled rectangle}
 \ifunc{glcd\_plotrectfill}
@@ -486,7 +495,7 @@ void glcd_plotrectfill(int16_t x,             // x coordinate
                        glcd_color_t color);   // color
 \end{lstlisting}
 
-Note: \lstinline|x| and \lstinline|y| specify the upper left corner.
+Note: see~\ref{sec:plotrect}.
 
 \subsubsection{Plot a rectangle with rounded corners}
 \ifunc{glcd\_plotrectrounded}
@@ -501,7 +510,7 @@ void glcd_plotrectrounded(int16_t x,            // x coordinate
                           glcd_color_t color);  // color
 \end{lstlisting}
 
-Note: \lstinline|x| and \lstinline|y| specify the upper left corner as plotted with \lstinline|glcd_plotrect|. \\
+Note: see~\ref{sec:plotrect}.\\
 Note: \lstinline|r| must be greater than 0.
 
 \subsubsection{Plot a filled rectangle with rounded corners}
@@ -517,7 +526,7 @@ void glcd_plotrectroundedfill(int16_t x,            // x coordinate
                               glcd_color_t color);  // color
 \end{lstlisting}
 
-Note: \lstinline|x| and \lstinline|y| specify the upper left corner as plotted with \lstinline|glcd_plotrect|.\\
+Note: Note: see~\ref{sec:plotrect}..\\
 Note: \lstinline|r| must be greater than 0.
 
 \subsubsection{Plot a circle}
@@ -625,7 +634,7 @@ void glcd_plotregularpolygon(int16_t xc,            // center x
 Note: this function is only available is \lstinline|GLCD_USE_REGULAR_POLYGON| is defined.\\
 Note: \lstinline|r| must be greater than 0.\\
 Note: this function uses \lstinline|sinf| and \lstinline|cosf| math functions, using the onboard FPU.\\
-Note: \lstinline|displ| is angle displacement from the positive x axis downwards.\\
+Note: \lstinline|displ| is angle displacement from the positive x axis downwards, in degrees.\\
 Note: if \lstinline|sides| is less than 1, nothing is plotted.\\
 Note: if \lstinline|sides| is 1, a point is plotted on (xc + r$\cdot$cos(angle), yc+r$\cdot$cos(angle)).\\
 Note: if \lstinline|sides| is 2, a line is plotted between (xc + r$\cdot$cos(angle), yc+r$\cdot$cos(angle)) and (xc + r$\cdot$cos($\pi$+angle), yc+r$\cdot$cos($\pi$+angle)).
@@ -1060,7 +1069,7 @@ The character is plotted towards positive x (i.e. to the right) and \textsl{nega
 Please note that there is no background color involved. This is because background pixel are never plotted (they are not encoded in the font), only the pixels in the (foreground) color are plotted.
 
 \subsubsection{Finding the bounding box of a character or string using an alternative font}
-If you ever need to determine the bounding box of a character or string, use the functions \lstinline|glcd_getcharsizewithfont| and \lstinline|glcd_getstringsizewithfont|. These functions provide the baseline coordinate of the (first) character and return the \textsl{upper-left} coordinate and the width and height of the bounding box. Function \lstinline|glcd_getstringsizewithfont| also needs the spacing. Because finding the bounding box returns four values, parameters are pointers to the variables. For example, for finding the bounding box of a string:
+If you ever need to determine the bounding box of a character or string, use the functions \lstinline|glcd_getcharsizewithfont| and \lstinline|glcd_getstringsizewithfont|. These functions need the baseline coordinate of the (first) character and return the \textsl{upper-left} coordinate and the width and height of the bounding box. Function \lstinline|glcd_getstringsizewithfont| also needs the spacing. Because finding the bounding box returns four values, parameters are pointers to the variables. For example, for finding the bounding box of a string:
 
 \begin{lstlisting}
 int16_t x=30, y=100;
@@ -1103,7 +1112,7 @@ To use these fonts, proceed as follows:
 \begin{lstlisting}
 #define PROGMEM
 \end{lstlisting}
-\item Scroll down to the end of the \lstinline|.c| file and make a note of the font handle. It look like:
+\item Scroll down to the end of the \lstinline|.c| file and make a note of the font handle. It looks like:
 \begin{lstlisting}
 const GFXfont <fonthandle> = {(uint8_t *)<fonthandle>Bitmaps,
                               (GFXglyph *)<fonthandle>Glyphs,
@@ -1240,7 +1249,7 @@ uint32_t touchscreen_init(ADC_TypeDef *used_ADC);
 \end{lstlisting}
 
 Note: this function must be called after the clock system is set up.\\
-Note: \lstinline|used_ADC| is an ADC handle. Only \lstinline|ADC1| and \lstinline|ADC2| are supported. \lstinline|ADC3| can't be used because it lacks sharing some input pins with ADC1 and ADC2.\\
+Note: \lstinline|used_ADC| is an ADC handle. For the STM32F446, only \lstinline|ADC1| and \lstinline|ADC2| are supported. \lstinline|ADC3| can't be used because it lacks sharing some input pins with ADC1 and ADC2. For the STM32F411, only ADC1 can be used, because this microntroller only has one ADC.\\
 Note: if the initialization succeeds a 1 is return, if failing a 0 is returned.\\
 Note: the ADC speed is set to the lowest value possible. If you want to change the ADC speed, see $\S$~\ref{sec:setadcspeed}.
 
@@ -1426,7 +1435,7 @@ Some STM32F4s only have one ADC (such as the STM32F411), so you need the touchsc
 \section{Debugging or production use}
 If you need to debug the functions, set the compiler optimization to \lstinline|-O0| (no optimization) or \lstinline|-Og| (optimize for debug). If you want to exhibit full speed support set the optimization to \lstinline|-Ofast|. If you need the smallest ROM footprint and have some speed over \lstinline|-O0|, set the optimization to \lstinline|-Os|.
 
-If you need mathematical functions in combination of the display, use \lstinline|float|s and the \lstinline|float| forms of the functions (like \lstinline|sinf| and \lstinline|cosf|). This will use the onboard FPU. \lstinline|float|s have 6 significant digits, which is more that enough for GLCD functions. Make sure that all floating constants are followed by an \lstinline|f|, like \lstinline|0.5f|. If you use \lstinline|double|s, all calculations will be done with software.
+If you need mathematical functions in combination of the display, use \lstinline|float|s and the \lstinline|float| forms of the functions (like \lstinline|sinf| and \lstinline|cosf|). This will use the onboard FPU. \lstinline|float|s have 6 significant digits, which is more that enough for GLCD functions. Make sure that all floating constants are followed by an \lstinline|f|, like \lstinline|0.5f|. If you use \lstinline|double|s or forget the \lstinline|.f| suffix, all calculations will be done with software.
 
 \section{Nice tricks}
 To wait until the touchscreen is touched, use one of
